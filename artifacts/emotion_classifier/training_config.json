@@ -1,0 +1,26 @@
+{
+  "model_name": "xlm-roberta-base",
+  "num_classes": 6,
+  "max_length": 64,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.1,
+  "batch_size": 16,
+  "accum_steps": 2,
+  "epochs": 15,
+  "lr": 0.0002,
+  "weight_decay": 0.01,
+  "patience": 3,
+  "seed": 42,
+  "alpha": [
+    0.8,
+    0.57,
+    0.5,
+    1.0,
+    1.0,
+    0.6
+  ],
+  "gamma": 2.0,
+  "data_path": "/kaggle/working/emotion_augmented",
+  "save_path": "/kaggle/working/best_emotion_model"
+}

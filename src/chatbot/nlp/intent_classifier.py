@@ -50,7 +50,12 @@ from dotenv import load_dotenv
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-load_dotenv()
+# Dynamically locate the project root relative to this file
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _CURRENT_DIR.parents[2]  # src/chatbot/nlp -> three levels up to project github root
+_ENV_PATH = _PROJECT_ROOT / ".env"
+# Explicitly load from the absolute path of your project root's .env
+load_dotenv(dotenv_path=_ENV_PATH)
 
 MODEL_NAME = "llama-3.1-8b-instant"
 EMBEDDING_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"

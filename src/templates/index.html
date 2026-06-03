@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mental Health RAG Chatbot</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header>
+        <h1>Mental Health RAG Chatbot</h1>
+        <p>Ask a supportive mental health question and get contextual responses.</p>
+      </header>
+
+      <main>
+        <section class="chat-window" id="chat-window"></section>
+
+        <form id="chat-form" class="chat-form">
+          <textarea id="query" placeholder="Type your message..." rows="3"></textarea>
+          <button type="submit">Send</button>
+        </form>
+      </main>
+
+      <footer>
+        <p>Responses are generated from retrieved mental health contexts.</p>
+      </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js" integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      const chatWindow = document.getElementById('chat-window');
+      const chatForm = document.getElementById('chat-form');
+      const queryInput = document.getElementById('query');
+
+      const renderMarkdown = (markdown) => {
+        const html = marked.parse(markdown || '');
+        return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+      };
+
+      const addBubble = (text, role) => {
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${role}`;
+
+        if (role === 'assistant') {
+          bubble.innerHTML = renderMarkdown(text);
+        } else {
+          bubble.textContent = text;
+        }
+
+        chatWindow.appendChild(bubble);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      };
+
+      const addCitations = (resources) => {
+        if (!Array.isArray(resources) || resources.length === 0) return;
+
+        const citationBlock = document.createElement('div');
+        citationBlock.className = 'citation-block';
+        citationBlock.innerHTML = `<div class="citation-title">Sources</div>`;
+
+        resources.forEach((resource, index) => {
+          const source = document.createElement('div');
+          source.className = 'citation-item';
+          source.innerHTML = `
+            <div class="citation-label">Source ${index + 1} • score ${resource.score.toFixed(2)}</div>
+            <div class="citation-text">${DOMPurify.sanitize(
+              resource.page_content.substring(0, 320),
+              { USE_PROFILES: { html: false } }
+            )}...</div>
+          `;
+          citationBlock.appendChild(source);
+        });
+
+        chatWindow.appendChild(citationBlock);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      };
+
+      chatForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        addBubble(query, 'user');
+        queryInput.value = '';
+        addBubble('Thinking...', 'assistant');
+
+        try {
+          const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+
+          const data = await response.json();
+          const lastAssistant = document.querySelector('.bubble.assistant:last-child');
+          const lastCitation = document.querySelector('.citation-block:last-child');
+
+          if (response.ok && data.answer) {
+            lastAssistant.innerHTML = renderMarkdown(data.answer);
+            if (lastCitation) {
+              lastCitation.remove();
+            }
+            addCitations(data.resources);
+          } else {
+            lastAssistant.textContent = data.detail || 'Something went wrong. Please try again.';
+          }
+        } catch (error) {
+          const lastAssistant = document.querySelector('.bubble.assistant:last-child');
+          lastAssistant.textContent = 'Unable to reach the server. Please try again later.';
+        }
+      });
+    </script>
+  </body>
+</html>

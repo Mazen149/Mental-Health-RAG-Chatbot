@@ -1,4 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List
 
@@ -26,6 +31,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+app.mount(
+    "/static",
+    StaticFiles(directory=str(BASE_DIR / "static")),
+    name="static",
+)
+
 rag: MentalHealthRAG | None = None
 
 
@@ -42,6 +55,11 @@ async def shutdown_event() -> None:
     global rag
     if rag is not None:
         rag.close()
+
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @app.get("/health")

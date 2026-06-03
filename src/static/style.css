@@ -1,0 +1,152 @@
+:root {
+  --bg: #f7fafc;
+  --card: #ffffff;
+  --text: #1f2937;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-soft: #e0f2fe;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, sans-serif;
+  background: linear-gradient(180deg, #eef2ff 0%, #f8fafc 100%);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 2.3rem;
+}
+
+header p {
+  margin: 12px auto 0;
+  color: var(--muted);
+  max-width: 720px;
+}
+
+.chat-window {
+  min-height: 480px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  padding: 18px;
+  background: var(--card);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bubble {
+  max-width: 80%;
+  padding: 14px 18px;
+  border-radius: 20px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.bubble.user {
+  align-self: flex-end;
+  background: var(--primary);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.bubble.assistant {
+  align-self: flex-start;
+  background: var(--primary-soft);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.citation-block {
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border: 1px solid #dbeafe;
+  border-radius: 16px;
+  font-size: 0.92rem;
+  color: var(--text);
+  max-width: 80%;
+  align-self: flex-start;
+}
+
+.citation-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.citation-item {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.citation-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.citation-label {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.citation-text {
+  color: var(--muted);
+  white-space: pre-wrap;
+}
+
+.chat-form {
+  margin-top: 20px;
+  display: grid;
+  gap: 12px;
+}
+
+textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 96px;
+}
+
+button {
+  width: 160px;
+  padding: 14px 18px;
+  border: none;
+  border-radius: 14px;
+  color: white;
+  background: var(--primary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #1d4ed8;
+}
+
+footer {
+  margin-top: 24px;
+  text-align: center;
+  color: var(--muted);
+}

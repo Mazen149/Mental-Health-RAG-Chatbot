@@ -11,3 +11,5 @@ wheels/
 mlruns/
 .env
 NLP Final Project.pdf
+.hf_cache/
+

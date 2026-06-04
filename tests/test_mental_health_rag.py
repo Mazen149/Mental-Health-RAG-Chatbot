@@ -88,7 +88,9 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
         
         # Mock Reranker scores
-        self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
+        mock_result = MagicMock()
+        mock_result.score = 0.99
+        self.rag.rerank_client.text_classification = MagicMock(return_value=[mock_result])
 
         # Mock Groq LLM API response
         mock_choice = MagicMock()

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Serene AI - Empathetic Mental Health Support</title>
+    <!-- Premium Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <!-- Top Decorative Blur Elements -->
+      <div class="blur-glow glow-1"></div>
+      <div class="blur-glow glow-2"></div>
+
+      <header class="hero-header">
+        <div class="header-icon-wrap">
+          <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+            <line x1="12" y1="19" x2="12" y2="22"/>
+          </svg>
+        </div>
+        <h1>Serene AI</h1>
+        <p>A safe, compassionate space for mental health support, grounded in professional counseling resources.</p>
+      </header>
+
+      <main class="chat-container">
+        <!-- Chat Area Header -->
+        <div class="chat-header">
+          <div class="status-indicator">
+            <span class="status-dot pulsing"></span>
+            <span class="status-text">Active & Grounded</span>
+          </div>
+          <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
+        </div>
+
+        <!-- Chat Window -->
+        <section class="chat-window" id="chat-window">
+          <div class="bubble assistant system-intro">
+            <h3>Welcome to Serene AI</h3>
+            <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress, relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.</p>
+          </div>
+        </section>
+
+        <!-- Chat Input Form -->
+        <form id="chat-form" class="chat-form">
+          <div class="input-wrapper">
+            <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
+            <button type="submit" id="send-btn" title="Send Message">
+              <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </main>
+
+      <footer class="app-footer">
+        <p>⚠️ <strong>Crisis Notice:</strong> If you are in immediate danger, please reach out to local emergency services or contact a national crisis hotline.</p>
+      </footer>
+    </div>
+
+    <!-- Formatting & Security Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js" integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+      const chatWindow = document.getElementById('chat-window');
+      const chatForm = document.getElementById('chat-form');
+      const queryInput = document.getElementById('query');
+      const sendBtn = document.getElementById('send-btn');
+
+      // Auto-grow textarea height
+      queryInput.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+      });
+
+      // Enter key submits (Shift+Enter inserts new line)
+      queryInput.addEventListener('keydown', function(event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          chatForm.requestSubmit();
+        }
+      });
+
+      const renderMarkdown = (markdown) => {
+        try {
+          if (typeof marked !== 'undefined' && marked.parse) {
+            const html = marked.parse(markdown || '');
+            if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+              return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
+            }
+            return html;
+          }
+        } catch (e) {
+          console.error("Markdown parse or sanitize error:", e);
+        }
+        return markdown || '';
+      };
+
+      const safeSanitize = (text) => {
+        try {
+          if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+            return DOMPurify.sanitize(text);
+          }
+        } catch (e) {
+          console.error("Sanitization error:", e);
+        }
+        return text || '';
+      };
+
+      // Emotion mappings to beautiful emojis and custom CSS classes
+      const EMOTION_MAP = {
+        "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
+        "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
+        "Love": { emoji: "💖", label: "Love", class: "emo-love" },
+        "Anger": { emoji: "🧡", label: "Anger", class: "emo-anger" },
+        "Fear": { emoji: "💜", label: "Fear", class: "emo-fear" },
+        "Surprise": { emoji: "💚", label: "Surprise", class: "emo-surprise" }
+      };
+
+      const addBubble = (text, role, metadata = null) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = `bubble-wrapper ${role}-wrapper`;
+
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${role}`;
+
+        if (role === 'assistant') {
+          if (text === 'Thinking...') {
+            bubble.innerHTML = `
+              <div class="typing-indicator">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            `;
+          } else {
+            bubble.innerHTML = renderMarkdown(text);
+          }
+        } else {
+          bubble.textContent = text;
+        }
+
+        wrapper.appendChild(bubble);
+
+        // Add Metadata pills if present (for assistant only)
+        if (role === 'assistant' && metadata && text !== 'Thinking...') {
+          const metaContainer = document.createElement('div');
+          metaContainer.className = 'meta-pills';
+
+          // 1. Language pill
+          if (metadata.language) {
+            const langPill = document.createElement('span');
+            langPill.className = 'meta-pill language-pill';
+            langPill.innerHTML = `🌐 ${metadata.language}`;
+            metaContainer.appendChild(langPill);
+          }
+
+          // 2. Emotion pills
+          if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
+            metadata.emotion.forEach(emo => {
+              const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
+              const emoPill = document.createElement('span');
+              emoPill.className = `meta-pill emotion-pill ${emoConfig.class}`;
+              emoPill.innerHTML = `${emoConfig.emoji} ${emoConfig.label}`;
+              metaContainer.appendChild(emoPill);
+            });
+          }
+
+          // 3. Intent pill
+          if (metadata.intent) {
+            const intentPill = document.createElement('span');
+            intentPill.className = 'meta-pill intent-pill';
+            let cleanIntent = metadata.intent.replace(/_/g, ' ');
+            if (cleanIntent === 'asking mental health question') cleanIntent = 'Counseling';
+            intentPill.innerHTML = `🧠 ${cleanIntent.charAt(0).toUpperCase() + cleanIntent.slice(1)}`;
+            metaContainer.appendChild(intentPill);
+          }
+
+          wrapper.appendChild(metaContainer);
+        }
+
+        chatWindow.appendChild(wrapper);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+        return wrapper;
+      };
+
+      const addCitations = (resources) => {
+        if (!Array.isArray(resources) || resources.length === 0) return;
+
+        const citationWrapper = document.createElement('div');
+        citationWrapper.className = 'citation-wrapper';
+
+        // Expandable Title Header
+        const header = document.createElement('div');
+        header.className = 'citation-header';
+        header.innerHTML = `
+          <span class="citation-header-title">📋 Grounding Contexts (${resources.length})</span>
+          <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        `;
+
+        const body = document.createElement('div');
+        body.className = 'citation-body collapsed';
+
+        resources.forEach((resource, index) => {
+          const item = document.createElement('div');
+          item.className = 'citation-item';
+          
+          const titleText = `Source ${index + 1}`;
+          const scoreText = `Relevance ${resource.score ? resource.score.toFixed(2) : '0.00'}`;
+          
+          item.innerHTML = `
+            <div class="citation-label">
+              <span class="citation-index">${titleText}</span>
+              <span class="citation-score">${scoreText}</span>
+            </div>
+            <div class="citation-text">${safeSanitize(resource.page_content)}</div>
+            ${resource.response ? `<div class="citation-response-preview"><strong>Counselor response:</strong> ${safeSanitize(resource.response)}</div>` : ''}
+          `;
+          body.appendChild(item);
+        });
+
+        // Toggle Expand/Collapse
+        header.addEventListener('click', () => {
+          body.classList.toggle('collapsed');
+          header.classList.toggle('expanded');
+        });
+
+        citationWrapper.appendChild(header);
+        citationWrapper.appendChild(body);
+        chatWindow.appendChild(citationWrapper);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+      };
+
+      chatForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        // Reset input area
+        queryInput.value = '';
+        queryInput.style.height = 'auto';
+
+        // Add user bubble and thinking state
+        addBubble(query, 'user');
+        const thinkingBubble = addBubble('Thinking...', 'assistant');
+
+        try {
+          const response = await fetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query }),
+          });
+
+          const data = await response.json();
+          
+          // Remove the thinking state bubble
+          thinkingBubble.remove();
+
+          if (response.ok && data.answer) {
+            // Add assistant bubble with full metadata pills
+            addBubble(data.answer, 'assistant', {
+              language: data.language,
+              emotion: data.emotion,
+              intent: data.intent
+            });
+            // Add expandable resources below response
+            addCitations(data.resources);
+          } else {
+            addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
+          }
+        } catch (error) {
+          thinkingBubble.remove();
+          addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
+        }
+      });
+    </script>
+  </body>
+</html>

@@ -50,12 +50,21 @@ from dotenv import load_dotenv
 # Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Dynamically locate the project root relative to this file
+# Dynamically locate the project root by searching upwards for .env or pyproject.toml
 _CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _CURRENT_DIR.parents[2]  # src/chatbot/nlp -> three levels up to project github root
+_PROJECT_ROOT = None
+for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
+        _PROJECT_ROOT = _parent
+        break
+if _PROJECT_ROOT is None:
+    _PROJECT_ROOT = _CURRENT_DIR.parents[2]  # Fallback
+
 _ENV_PATH = _PROJECT_ROOT / ".env"
-# Explicitly load from the absolute path of your project root's .env
-load_dotenv(dotenv_path=_ENV_PATH)
+if _ENV_PATH.exists():
+    load_dotenv(dotenv_path=_ENV_PATH)
+else:
+    load_dotenv()
 
 MODEL_NAME = "llama-3.1-8b-instant"
 EMBEDDING_MODEL_NAME = "paraphrase-multilingual-mpnet-base-v2"

@@ -1,4 +1,23 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Dynamically locate the project root by searching upwards for .env or pyproject.toml
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = None
+for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
+        _PROJECT_ROOT = _parent
+        break
+if _PROJECT_ROOT is None:
+    _PROJECT_ROOT = _CURRENT_DIR.parent  # Fallback
+
+_ENV_PATH = _PROJECT_ROOT / ".env"
+if _ENV_PATH.exists():
+    load_dotenv(dotenv_path=_ENV_PATH)
+else:
+    load_dotenv()
+
 import re
 import asyncio
 from .modules import detect_language, classify_emotion, classify_intent
@@ -149,8 +168,13 @@ async def route_query(query: str, rag_instance) -> dict:
     # =============================================
     # LAYER 2: LLM Intent Classification (parallel with lang + emotion)
     # =============================================
+    query_words = query.strip().split()
+    query_for_lang = query
+    if len(query_words) < 5:
+        query_for_lang = f"/p /p /p /p {query.strip()} /p /p /p /p"
+
     intent_task = asyncio.to_thread(classify_intent, query)
-    lang_task = asyncio.to_thread(detect_language, query)
+    lang_task = asyncio.to_thread(detect_language, query_for_lang)
     emotion_task = asyncio.to_thread(classify_emotion, query)
     
     try:

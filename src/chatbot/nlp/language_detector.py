@@ -43,11 +43,18 @@ LANGUAGE_NAMES = {
     "tr": "Turkish",   "ur": "Urdu",      "vi": "Vietnamese", "zh": "Chinese",
 }
 
-# Default artifact paths (relative to project root, resolving from package location)
+# Dynamically locate the project root by searching upwards for .env or pyproject.toml
 _CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _CURRENT_DIR.parents[2]  # points to project github root
-_DEFAULT_MODEL_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "language_detection_best_model.pkl"
-_DEFAULT_VECTORIZER_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "language_detection_best_vectorizer.pkl"
+_PROJECT_ROOT = None
+for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
+        _PROJECT_ROOT = _parent
+        break
+if _PROJECT_ROOT is None:
+    _PROJECT_ROOT = _CURRENT_DIR.parents[2]  # Fallback
+
+_DEFAULT_MODEL_PATH = _PROJECT_ROOT / "artifacts" / "language_detection_best_model.pkl"
+_DEFAULT_VECTORIZER_PATH = _PROJECT_ROOT / "artifacts" / "language_detection_best_vectorizer.pkl"
 
 
 # ─────────────────────────────────────────────────────────────────────────────

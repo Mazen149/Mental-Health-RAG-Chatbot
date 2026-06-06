@@ -1,6 +1,21 @@
-from dotenv import load_dotenv
-load_dotenv()
 from pathlib import Path
+from dotenv import load_dotenv
+
+# Dynamically locate the project root by searching upwards for .env or pyproject.toml
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = None
+for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
+        _PROJECT_ROOT = _parent
+        break
+if _PROJECT_ROOT is None:
+    _PROJECT_ROOT = _CURRENT_DIR.parent  # Fallback
+
+_ENV_PATH = _PROJECT_ROOT / ".env"
+if _ENV_PATH.exists():
+    load_dotenv(dotenv_path=_ENV_PATH)
+else:
+    load_dotenv()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -42,6 +57,7 @@ def validate_environment() -> None:
     groq_api_key = os.getenv("GROQ_API_KEY")
     hf_token = os.getenv("HF_TOKEN")
     qdrant_url = os.getenv("QDRANT_URL")
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
     
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
     qdrant_local_path = os.path.join(base_dir, "qdrant_db")
@@ -92,17 +108,17 @@ def validate_environment() -> None:
         try:
             from qdrant_client import QdrantClient
             if qdrant_url:
-                client = QdrantClient(url=qdrant_url)
+                client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
             else:
                 client = QdrantClient(path=qdrant_local_path)
             
             collections = [c.name for c in client.get_collections().collections]
             if "mental_health" not in collections:
-                errors.append("Qdrant collection 'mental_health' not found in database.")
+                print("Notice: Qdrant collection 'mental_health' not found. It will be created and populated on startup.")
             else:
                 count_info = client.count(collection_name="mental_health")
                 if count_info.count == 0:
-                    errors.append("Qdrant collection 'mental_health' is empty (contains 0 vectors).")
+                    print("Notice: Qdrant collection 'mental_health' is empty. It will be populated on startup.")
             client.close()
         except Exception as e:
             errors.append(f"Failed to connect to Qdrant or query collection 'mental_health': {e}")
@@ -151,8 +167,11 @@ async def shutdown_event() -> None:
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
-
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={}
+    )
 
 @app.get("/health")
 async def health_check() -> dict:

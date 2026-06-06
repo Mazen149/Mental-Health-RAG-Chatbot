@@ -13,11 +13,26 @@ from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbe
 from langchain_qdrant import QdrantVectorStore
 from langchain_classic.retrievers.ensemble import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
+from pathlib import Path
 from dotenv import load_dotenv
 from typing import List
 from huggingface_hub import InferenceClient
 
-load_dotenv()
+# Dynamically locate the project root by searching upwards for .env or pyproject.toml
+_CURRENT_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = None
+for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
+    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
+        _PROJECT_ROOT = _parent
+        break
+if _PROJECT_ROOT is None:
+    _PROJECT_ROOT = _CURRENT_DIR.parent  # Fallback
+
+_ENV_PATH = _PROJECT_ROOT / ".env"
+if _ENV_PATH.exists():
+    load_dotenv(dotenv_path=_ENV_PATH)
+else:
+    load_dotenv()
 
 SYSTEM_PROMPT = """
 You are a compassionate mental health assistant. Use the following retrieved contexts to provide a supportive and informative answer to the user's query.
@@ -192,34 +207,58 @@ class MentalHealthRAG:
         return documents
 
     def setup_retriever(self, documents: List[Document]) -> None:
-        """Sets up retrievers. Instantly loads Qdrant vectors from disk if they already exist."""
+        """Sets up retrievers. Instantly loads Qdrant vectors from disk or cloud if they already exist."""
+        qdrant_url = os.getenv("QDRANT_URL")
+        qdrant_api_key = os.getenv("QDRANT_API_KEY")
 
-        # Only open the local Qdrant client if the collection already exists.
-        collections = []
-        if os.path.exists(self.qdrant_path):
+        if qdrant_url:
+            print(f"--> Connecting to Qdrant Cloud at: {qdrant_url}")
+            self.qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+        else:
+            print(f"--> Connecting to local Qdrant database at: {self.qdrant_path}")
             self.qdrant_client = QdrantClient(path=self.qdrant_path)
-            collections = [
-                c.name for c in self.qdrant_client.get_collections().collections
-            ]
 
-        if self.collection_name not in collections:
-            if self.qdrant_client is not None:
-                self.qdrant_client.close()
-                self.qdrant_client = None
+        collections = [c.name for c in self.qdrant_client.get_collections().collections]
+        
+        collection_exists = self.collection_name in collections
+        collection_empty = False
+        if collection_exists:
+            count_info = self.qdrant_client.count(collection_name=self.collection_name)
+            if count_info.count == 0:
+                collection_empty = True
 
-            print(
-                "--> Qdrant collection not found. Generating dense embeddings (this may take a few minutes)..."
-            )
-            self.vectorstore = QdrantVectorStore.from_documents(
-                documents,
-                self.embeddings,
-                path=self.qdrant_path,
-                collection_name=self.collection_name,
-                distance=Distance.COSINE,
-            )
+        if not collection_exists or collection_empty:
+            if collection_empty:
+                print(f"--> Collection '{self.collection_name}' exists but is empty. Deleting and re-populating...")
+                try:
+                    self.qdrant_client.delete_collection(collection_name=self.collection_name)
+                except Exception as e:
+                    print(f"Warning: Failed to delete empty collection: {e}")
+            else:
+                print(
+                    f"--> Qdrant collection '{self.collection_name}' not found. Generating dense embeddings (this may take a few minutes)..."
+                )
+            
+            if qdrant_url:
+                self.vectorstore = QdrantVectorStore.from_documents(
+                    documents,
+                    self.embeddings,
+                    url=qdrant_url,
+                    api_key=qdrant_api_key,
+                    collection_name=self.collection_name,
+                    distance=Distance.COSINE,
+                )
+            else:
+                self.vectorstore = QdrantVectorStore.from_documents(
+                    documents,
+                    self.embeddings,
+                    path=self.qdrant_path,
+                    collection_name=self.collection_name,
+                    distance=Distance.COSINE,
+                )
         else:
             print(
-                "--> Existing Qdrant index found! Loading vectors from disk instantly..."
+                f"--> Existing Qdrant index '{self.collection_name}' found! Loading vectors instantly..."
             )
             self.vectorstore = QdrantVectorStore(
                 client=self.qdrant_client,

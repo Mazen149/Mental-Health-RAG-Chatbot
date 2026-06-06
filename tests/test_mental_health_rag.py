@@ -8,14 +8,14 @@ from langchain_core.documents import Document
 
 # Assuming your main class is in a file named rag_pipeline.py inside the parent directory
 # We adjust the import paths or use mocking safely
-from src.rag_pipeline import MentalHealthRAG
+from src.modules.rag import MentalHealthRAG
 
 class TestMentalHealthRAG(unittest.TestCase):
 
-    @patch('src.rag_pipeline.QdrantClient')
-    @patch('src.rag_pipeline.HuggingFaceEmbeddings')
-    @patch('src.rag_pipeline.CrossEncoder')
-    @patch('src.rag_pipeline.Groq')
+    @patch('src.modules.rag.QdrantClient')
+    @patch('src.modules.rag.HuggingFaceEmbeddings')
+    @patch('src.modules.rag.CrossEncoder')
+    @patch('src.modules.rag.Groq')
     def setUp(self, mock_groq, mock_cross, mock_hf, mock_qdrant):
         """Set up a fresh instance of the RAG class with mocked heavy models."""
         self.cache_path = os.path.join(
@@ -79,7 +79,7 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.assertEqual(response["answer"], "Retriever not set up.")
         self.assertEqual(response["resources"], [])
 
-    @patch('src.rag_pipeline.EnsembleRetriever')
+    @patch('src.modules.rag.EnsembleRetriever')
     def test_language_alignment_prompting(self, mock_ensemble):
         """Verify LLM payload includes query context properly during execution."""
         # Setup mock hybrid retriever output
@@ -88,9 +88,7 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
         
         # Mock Reranker scores
-        mock_result = MagicMock()
-        mock_result.score = 0.99
-        self.rag.rerank_client.text_classification = MagicMock(return_value=[mock_result])
+        self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
 
         # Mock Groq LLM API response
         mock_choice = MagicMock()

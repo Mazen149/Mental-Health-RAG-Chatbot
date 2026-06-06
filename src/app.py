@@ -24,7 +24,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from typing import List
 
-from .rag_pipeline import MentalHealthRAG
+from .modules.rag import MentalHealthRAG
 from .router import route_query
 
 
@@ -88,8 +88,8 @@ def validate_environment() -> None:
             errors.append(f"Missing required pip package: {pkg}")
             
     # 3. Module 1 artifacts
-    mod1_vectorizer = os.path.join(base_dir, "artifacts", "language_detection_best_vectorizer.pkl")
-    mod1_classifier = os.path.join(base_dir, "artifacts", "language_detection_best_model.pkl")
+    mod1_vectorizer = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_vectorizer.pkl")
+    mod1_classifier = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_model.pkl")
     if not os.path.exists(mod1_vectorizer):
         errors.append(f"Module 1 vectorizer pickle not found at: {mod1_vectorizer}")
     if not os.path.exists(mod1_classifier):

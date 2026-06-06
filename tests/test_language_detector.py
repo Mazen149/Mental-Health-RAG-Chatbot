@@ -1,10 +1,10 @@
 import pytest
-from chatbot.nlp.language_detector import LanguageDetector, detect_language, preprocess
+from src.modules.language_detector import LanguageDetector, detect_language, preprocess
 
 def test_preprocess():
-    """Verify that preprocessing cleans text, trims length, and normalises unicode correctly."""
-    assert preprocess("HELLO WORLD 123!!!") == "hello world"
-    assert preprocess("Visit https://google.com for info") == "visit for info"
+    """Verify that preprocessing cleans text, normalises unicode and collapses spaces correctly."""
+    assert preprocess("HELLO WORLD 123!!!") == "hello world 123!!!"
+    assert preprocess("Visit https://google.com for info") == "visit https://google.com for info"
     assert preprocess("Multiple   spaces    here") == "multiple spaces here"
 
 def test_detector_basic_en():

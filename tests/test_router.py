@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import numpy as np
 from src.router import route_query, get_direct_greeting
-from src.rag_pipeline import build_system_prompt, detect_crisis
+from src.modules.rag import build_system_prompt, detect_crisis
 
 class TestRouter(unittest.IsolatedAsyncioTestCase):
 

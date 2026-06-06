@@ -21,7 +21,7 @@ else:
 import re
 import asyncio
 from .modules import detect_language, classify_emotion, classify_intent
-from .rag_pipeline import build_system_prompt
+from .modules.rag import build_system_prompt
 
 # Read toggle for query translation (default is False, so we retrieve directly)
 ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in ("true", "1", "yes")

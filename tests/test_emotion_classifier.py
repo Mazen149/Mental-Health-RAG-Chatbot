@@ -3,15 +3,15 @@ from unittest.mock import patch, MagicMock
 from pathlib import Path
 import numpy as np
 
-from chatbot.nlp.emotion_classifier import EmotionClassifier, detect_emotion, EMOTION_MAP
+from src.modules.emotion_classifier import EmotionClassifier, detect_emotion, EMOTION_MAP
 
 @pytest.fixture
 def mock_classifier():
     """Fixture that mocks the heavy model loading and returns a dummy classifier."""
-    with patch('chatbot.nlp.emotion_classifier.AutoModelForSequenceClassification.from_pretrained') as mock_base, \
-         patch('chatbot.nlp.emotion_classifier.PeftModel.from_pretrained') as mock_peft, \
-         patch('chatbot.nlp.emotion_classifier.AutoTokenizer.from_pretrained') as mock_tokenizer, \
-         patch('chatbot.nlp.emotion_classifier.Path.exists', return_value=True):
+    with patch('src.modules.emotion_classifier.AutoModelForSequenceClassification.from_pretrained') as mock_base, \
+         patch('src.modules.emotion_classifier.PeftModel.from_pretrained') as mock_peft, \
+         patch('src.modules.emotion_classifier.AutoTokenizer.from_pretrained') as mock_tokenizer, \
+         patch('src.modules.emotion_classifier.Path.exists', return_value=True):
         
         # Setup mock tokenizer
         mock_tok_instance = MagicMock()
@@ -28,7 +28,7 @@ def mock_classifier():
 
 def test_missing_model_directory():
     """Verify that a FileNotFoundError is raised if the model path doesn't exist."""
-    with patch('chatbot.nlp.emotion_classifier.Path.exists', return_value=False):
+    with patch('src.modules.emotion_classifier.Path.exists', return_value=False):
         with pytest.raises(FileNotFoundError):
             EmotionClassifier(model_path="fake/path")
 
@@ -38,8 +38,8 @@ def test_predict_empty_text(mock_classifier):
     assert result["emotion"] == "Unknown"
     assert result["confidence"] == 0.0
 
-@patch('chatbot.nlp.emotion_classifier.torch.softmax')
-@patch('chatbot.nlp.emotion_classifier.torch.no_grad')
+@patch('src.modules.emotion_classifier.torch.softmax')
+@patch('src.modules.emotion_classifier.torch.no_grad')
 def test_predict_standard(mock_no_grad, mock_softmax, mock_classifier):
     """Test standard emotion prediction with mocked logits/softmax."""
     # Mock the model output
@@ -62,11 +62,11 @@ def test_predict_standard(mock_no_grad, mock_softmax, mock_classifier):
     assert result["all_scores"]["Sadness"] == 0.85
     assert result["all_scores"]["Joy"] == 0.05
 
-@patch('chatbot.nlp.emotion_classifier.torch.softmax')
-@patch('chatbot.nlp.emotion_classifier.torch.no_grad')
+@patch('src.modules.emotion_classifier.torch.softmax')
+@patch('src.modules.emotion_classifier.torch.no_grad')
 def test_detect_emotion_convenience(mock_no_grad, mock_softmax):
     """Test the module-level singleton convenience function."""
-    with patch('chatbot.nlp.emotion_classifier.EmotionClassifier') as mock_init:
+    with patch('src.modules.emotion_classifier.EmotionClassifier') as mock_init:
         mock_instance = MagicMock()
         mock_instance.predict.return_value = {
             "emotion": "Anger",

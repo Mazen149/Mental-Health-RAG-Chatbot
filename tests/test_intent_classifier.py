@@ -1,66 +1,110 @@
 import pytest
-from unittest.mock import MagicMock
-from chatbot.nlp.intent_classifier import IntentClassifier, IntentRouter, classify_intent
+from unittest.mock import MagicMock, patch
+import numpy as np
+from src.modules.intent_classifier import IntentClassifier, IntentRouter, Intent
 
-def test_intent_classifier_rule_based():
-    """Verify Stage 1 Rule-Based classifier triggers on keyword patterns and false-positive guards."""
+@pytest.fixture(autouse=True)
+def mock_hf_inference():
+    """Autouse fixture to mock Hugging Face InferenceClient during test execution."""
+    with patch("src.modules.intent_classifier.InferenceClient") as mock_client_class:
+        mock_client_inst = MagicMock()
+        
+        # Mock feature extraction to return dummy vectors of length 384
+        def mock_extract(texts, model=None):
+            if isinstance(texts, str):
+                # Return single embedding vector
+                return [0.05] * 384
+            # Return list of embedding vectors
+            return [[0.05] * 384 for _ in texts]
+            
+        mock_client_inst.feature_extraction.side_effect = mock_extract
+        mock_client_class.return_value = mock_client_inst
+        yield mock_client_inst
+
+def test_intent_classifier_embedding_match():
+    """Verify that classifier returns Intent object on successful embedding lookup."""
     classifier = IntentClassifier()
     
-    # Test greeting rule-based trigger
-    res = classifier.classify("Hi there!")
-    assert res["intent"] == "greeting"
-    assert res["stage"] == "rule_based"
-    assert res["confidence"] == 0.95
-    
-    # Test gratitude rule-based trigger
-    res = classifier.classify("thank you so much")
-    assert res["intent"] == "gratitude"
-    assert res["stage"] == "rule_based"
-    
-    # Test goodbye rule-based trigger
-    res = classifier.classify("bye bye!")
-    assert res["intent"] == "goodbye"
-    assert res["stage"] == "rule_based"
+    # We force self._get_embedding to return a vector that aligns with general/mh/out_of_scope
+    # Or simply mock the embedding classifier output
+    with patch.object(classifier, "_embedding_classifier") as mock_embed:
+        mock_embed.return_value = Intent(type="asking_mental_health_question", confidence=0.88, classifier="embedding")
+        
+        res = classifier.classify("I feel anxious")
+        assert res.type == "asking_mental_health_question"
+        assert res.confidence == 0.88
+        assert res.classifier == "embedding"
 
-def test_intent_classifier_embedding():
-    """Verify Stage 2 Embedding classification matches semantic mental health queries to centroids."""
+def test_intent_classifier_llm_fallback_success():
+    """Verify cascading to Ollama fallback when embedding classifier returns None."""
     classifier = IntentClassifier()
     
-    # Test mental health questions trigger embedding centroid routing
-    res = classifier.classify("I have been feeling extremely stressed and anxious lately")
-    assert res["intent"] == "asking_mental_health_question"
-    assert res["stage"] == "embedding"
-    assert res["confidence"] >= 0.7
+    with patch.object(classifier, "_embedding_classifier", return_value=None), \
+         patch("src.modules.intent_classifier.urlopen") as mock_urlopen:
+        
+        # Mock successful Ollama response returning json
+        mock_response = MagicMock()
+        mock_json = json_bytes = b'{"message": {"content": "{\\"type\\": \\"out_of_scope\\", \\"confidence\\": 0.95}"}}'
+        mock_response.read.return_value = mock_json
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        
+        res = classifier.classify("What is Python?")
+        assert res.type == "out_of_scope"
+        assert res.confidence == 0.95
+        assert res.classifier == "llm"
 
-def test_intent_classifier_llm_fallback():
-    """Verify Stage 3 LLM fallback is triggered and mock the Groq completions call for offline stability."""
-    classifier = IntentClassifier(groq_api_key="mock_key")
+def test_intent_classifier_heuristic_fallback():
+    """Verify heuristic fallback triggers when Ollama call fails or times out."""
+    classifier = IntentClassifier()
     
-    # Mock the Groq completions.create to return out_of_scope
-    mock_response = MagicMock()
-    mock_response.choices = [
-        MagicMock(message=MagicMock(content='{"intent": "out_of_scope", "confidence": 0.9}'))
-    ]
-    classifier._groq_client.chat.completions.create = MagicMock(return_value=mock_response)
-    
-    # A query that fails both Stage 1 and Stage 2 -> falls back to mocked Stage 3
-    res = classifier.classify("What is the stock price of Tesla?")
-    assert res["intent"] == "out_of_scope"
-    assert res["stage"] == "llm"
-    assert res["confidence"] == 0.9
-    classifier._groq_client.chat.completions.create.assert_called_once()
+    with patch.object(classifier, "_embedding_classifier", return_value=None), \
+         patch("src.modules.intent_classifier.urlopen", side_effect=TimeoutError("Connection timed out")):
+        
+        # Query containing mental health signals -> heuristic should classify as asking_mental_health_question
+        res = classifier.classify("I'm feeling very sad and stressed out")
+        assert res.type == "asking_mental_health_question"
+        assert res.confidence == 0.72
+        assert res.classifier == "llm"
+        
+        # General query -> heuristic fallback
+        res_general = classifier.classify("hello there")
+        assert res_general.type == "general"
+        assert res_general.confidence == 0.55
 
 def test_intent_router():
-    """Verify that IntentRouter maps the classifier outputs to the RAG routing rules correctly."""
+    """Verify IntentRouter routes general, out_of_scope, and mental health questions correctly."""
     router = IntentRouter()
     
-    res = router.route("Hello!", detected_language="en")
-    assert res["intent"] == "greeting"
-    assert res["action"] == "direct_reply"
-    assert res["use_rag"] is False
-    assert res["response"] is not None
+    with patch.object(router.classifier, "classify") as mock_classify:
+        # 1. General intent routing
+        mock_classify.return_value = Intent(type="general", confidence=0.9, classifier="embedding")
+        res = router.route("Hello!", detected_language="en")
+        assert res["intent"] == "general"
+        assert res["action"] == "direct_reply"
+        assert res["use_rag"] is False
+        assert "support you" in res["response"]
+        
+        # 2. Mental health question routing
+        mock_classify.return_value = Intent(type="asking_mental_health_question", confidence=0.85, classifier="embedding")
+        res_mh = router.route("I'm sad", detected_language="en")
+        assert res_mh["intent"] == "asking_mental_health_question"
+        assert res_mh["action"] == "rag_pipeline"
+        assert res_mh["use_rag"] is True
+        assert res_mh["response"] is None
+        
+        # 3. Out of scope routing
+        mock_classify.return_value = Intent(type="out_of_scope", confidence=0.95, classifier="llm")
+        res_oos = router.route("weather", detected_language="en")
+        assert res_oos["intent"] == "out_of_scope"
+        assert res_oos["action"] == "decline"
+        assert res_oos["use_rag"] is False
+        assert "specialised in mental health" in res_oos["response"]
 
 def test_convenience_function():
-    """Verify module-level singleton convenience classifier."""
-    res = classify_intent("hi")
-    assert res["intent"] == "greeting"
+    """Verify singleton convenience classifier wrapper."""
+    from src.modules.intent_classifier import classify_intent
+    
+    with patch("src.modules.intent_classifier._classifier_instance") as mock_inst:
+        mock_inst.classify.return_value = Intent(type="general", confidence=0.9, classifier="embedding")
+        res = classify_intent("hi")
+        assert res.type == "general"

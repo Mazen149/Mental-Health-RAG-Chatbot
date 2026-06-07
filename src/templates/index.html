@@ -128,6 +128,30 @@
         const wrapper = document.createElement('div');
         wrapper.className = `bubble-wrapper ${role}-wrapper`;
 
+        // Create Avatar element
+        const avatar = document.createElement('div');
+        avatar.className = `avatar ${role}-avatar`;
+        if (role === 'assistant') {
+          avatar.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
+              <line x1="12" y1="19" x2="12" y2="22"/>
+            </svg>
+          `;
+        } else {
+          avatar.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          `;
+        }
+
+        // Create bubble content wrapper (holds bubble + pills + citations)
+        const contentArea = document.createElement('div');
+        contentArea.className = 'bubble-content-area';
+
         const bubble = document.createElement('div');
         bubble.className = `bubble ${role}`;
 
@@ -141,13 +165,18 @@
               </div>
             `;
           } else {
-            bubble.innerHTML = renderMarkdown(text);
+            // Replace [1], [2], [3] citations with pretty interactive inline-citation badges
+            let formattedText = text || '';
+            formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
+              return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
+            });
+            bubble.innerHTML = renderMarkdown(formattedText);
           }
         } else {
           bubble.textContent = text;
         }
 
-        wrapper.appendChild(bubble);
+        contentArea.appendChild(bubble);
 
         // Add Metadata pills if present (for assistant only)
         if (role === 'assistant' && metadata && text !== 'Thinking...') {
@@ -183,7 +212,16 @@
             metaContainer.appendChild(intentPill);
           }
 
-          wrapper.appendChild(metaContainer);
+          contentArea.appendChild(metaContainer);
+        }
+
+        // Arrange elements in bubble wrapper depending on role
+        if (role === 'assistant') {
+          wrapper.appendChild(avatar);
+          wrapper.appendChild(contentArea);
+        } else {
+          wrapper.appendChild(contentArea);
+          wrapper.appendChild(avatar);
         }
 
         chatWindow.appendChild(wrapper);
@@ -191,8 +229,11 @@
         return wrapper;
       };
 
-      const addCitations = (resources) => {
+      const addCitations = (resources, parentWrapper) => {
         if (!Array.isArray(resources) || resources.length === 0) return;
+
+        const contentArea = parentWrapper.querySelector('.bubble-content-area');
+        if (!contentArea) return;
 
         const citationWrapper = document.createElement('div');
         citationWrapper.className = 'citation-wrapper';
@@ -201,7 +242,14 @@
         const header = document.createElement('div');
         header.className = 'citation-header';
         header.innerHTML = `
-          <span class="citation-header-title">📋 Grounding Contexts (${resources.length})</span>
+          <span class="citation-header-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom; margin-right: 4px;">
+              <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
+              <path d="M12 16v-4"/>
+              <path d="M12 8h.01"/>
+            </svg>
+            Grounded Reference Sources (${resources.length})
+          </span>
           <svg class="chevron-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="6 9 12 15 18 9"></polyline>
           </svg>
@@ -214,16 +262,43 @@
           const item = document.createElement('div');
           item.className = 'citation-item';
           
-          const titleText = `Source ${index + 1}`;
-          const scoreText = `Relevance ${resource.score ? resource.score.toFixed(2) : '0.00'}`;
+          const titleText = `Ref #MHC-${index + 1}`;
+          const score = resource.score ? resource.score : 0.0;
+          
+          let scoreLabel = '';
+          let scoreClass = 'med';
+          if (score >= 0 && score <= 1.0) {
+            scoreLabel = `${(score * 100).toFixed(0)}% Match`;
+            if (score >= 0.7) scoreClass = 'high';
+          } else {
+            scoreLabel = `Score ${score.toFixed(1)}`;
+            if (score >= 2.0) scoreClass = 'high';
+          }
           
           item.innerHTML = `
             <div class="citation-label">
-              <span class="citation-index">${titleText}</span>
-              <span class="citation-score">${scoreText}</span>
+              <span class="citation-index">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+                ${titleText}
+              </span>
+              <span class="citation-score ${scoreClass}">${scoreLabel}</span>
             </div>
-            <div class="citation-text">${safeSanitize(resource.page_content)}</div>
-            ${resource.response ? `<div class="citation-response-preview"><strong>Counselor response:</strong> ${safeSanitize(resource.response)}</div>` : ''}
+            <div class="citation-text-container">
+              <div class="citation-section-title">📄 Counseling Case / Context:</div>
+              <div class="citation-text">${safeSanitize(resource.page_content)}</div>
+            </div>
+            ${resource.response ? `
+              <div class="citation-response-preview">
+                <div class="citation-section-title">🧑‍⚕️ Clinical Advice / Response:</div>
+                <div class="citation-response-text">${safeSanitize(resource.response)}</div>
+              </div>
+            ` : ''}
           `;
           body.appendChild(item);
         });
@@ -236,8 +311,30 @@
 
         citationWrapper.appendChild(header);
         citationWrapper.appendChild(body);
-        chatWindow.appendChild(citationWrapper);
+        contentArea.appendChild(citationWrapper);
         chatWindow.scrollTop = chatWindow.scrollHeight;
+      };
+
+      window.highlightSource = (event, index) => {
+        event.stopPropagation();
+        const wrapper = event.target.closest('.bubble-wrapper');
+        if (!wrapper) return;
+        const header = wrapper.querySelector('.citation-header');
+        const body = wrapper.querySelector('.citation-body');
+        if (header && body) {
+          if (body.classList.contains('collapsed')) {
+            body.classList.remove('collapsed');
+            header.classList.add('expanded');
+          }
+          const items = body.querySelectorAll('.citation-item');
+          if (items.length >= index) {
+            const targetItem = items[index - 1];
+            targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            targetItem.classList.remove('highlight-pulse');
+            void targetItem.offsetWidth; // Force reflow
+            targetItem.classList.add('highlight-pulse');
+          }
+        }
       };
 
       chatForm.addEventListener('submit', async (event) => {
@@ -267,13 +364,13 @@
 
           if (response.ok && data.answer) {
             // Add assistant bubble with full metadata pills
-            addBubble(data.answer, 'assistant', {
+            const bubbleWrapper = addBubble(data.answer, 'assistant', {
               language: data.language,
               emotion: data.emotion,
               intent: data.intent
             });
-            // Add expandable resources below response
-            addCitations(data.resources);
+            // Add expandable resources below response inside the bubble wrapper
+            addCitations(data.resources, bubbleWrapper);
           } else {
             addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
           }

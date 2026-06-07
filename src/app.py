@@ -1,7 +1,28 @@
-from pathlib import Path
-from dotenv import load_dotenv
+"""
+================================================================================
+SERENE AI — FASTAPI APPLICATION SERVER
+================================================================================
+Empathetic, multi-layered mental health support backend leveraging
+asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
+================================================================================
+"""
 
-# Dynamically locate the project root by searching upwards for .env or pyproject.toml
+import importlib
+import os
+from pathlib import Path
+import sys
+from typing import List
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
+
+# ------------------------------------------------------------------------------
+# 1. Environment Loading & Project Root Identification
+# ------------------------------------------------------------------------------
 _CURRENT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = None
 for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
@@ -17,43 +38,69 @@ if _ENV_PATH.exists():
 else:
     load_dotenv()
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
-from typing import List
-
+# Local project imports (must load after environment resolution)
 from .modules.rag import MentalHealthRAG
 from .router import route_query
 
-
+# ------------------------------------------------------------------------------
+# 2. Pydantic API Schemas
+# ------------------------------------------------------------------------------
 class ChatRequest(BaseModel):
-    query: str
+    query: str = Field(
+        ..., 
+        description="The user's query or message to the mental health chatbot."
+    )
 
 
 class Resource(BaseModel):
-    score: float
-    page_content: str
-    response: str
+    score: float = Field(
+        ..., 
+        description="The semantic or reranked relevance score of this document context."
+    )
+    page_content: str = Field(
+        ..., 
+        description="The counseling context representing the user's situation."
+    )
+    response: str = Field(
+        ..., 
+        description="The verified clinical advice or response corresponding to this context."
+    )
 
 
 class ChatResponse(BaseModel):
-    answer: str
-    resources: List[Resource]
-    language: str | None = None
-    emotion: List[str] | None = None
-    intent: str | None = None
+    answer: str = Field(
+        ..., 
+        description="The empathetic, model-generated response grounded in grounding contexts."
+    )
+    resources: List[Resource] = Field(
+        ..., 
+        description="The list of grounding counseling cases and clinician advices retrieved."
+    )
+    language: str | None = Field(
+        None, 
+        description="The detected language of the user query."
+    )
+    emotion: List[str] | None = Field(
+        None, 
+        description="The detected emotional states from emotion classifier."
+    )
+    intent: str | None = Field(
+        None, 
+        description="The classified conversational or clinical intent of the query."
+    )
 
 
+# ------------------------------------------------------------------------------
+# 3. Environment Validation Helper
+# ------------------------------------------------------------------------------
 def validate_environment() -> None:
-    import os
-    import sys
-    import importlib
-    
+    """
+    Validates essential environment variables, model artifacts, required packages,
+    and Qdrant connectivity before server boot.
+    """
     errors = []
     
-    # 1. Environment variables
+    # Verify environment API variables
     groq_api_key = os.getenv("GROQ_API_KEY")
     hf_token = os.getenv("HF_TOKEN")
     qdrant_url = os.getenv("QDRANT_URL")
@@ -74,9 +121,12 @@ def validate_environment() -> None:
         qdrant_ok = True
         
     if not qdrant_ok:
-        errors.append(f"Qdrant database not configured. Neither QDRANT_URL environment variable is set, nor does local Qdrant database folder exist at: {qdrant_local_path}")
+        errors.append(
+            f"Qdrant database not configured. Neither QDRANT_URL is set, "
+            f"nor does local Qdrant database exist at: {qdrant_local_path}"
+        )
         
-    # 2. Required pip packages
+    # Verify mandatory dependencies
     required_packages = [
         "peft", "transformers", "sentence_transformers", 
         "qdrant_client", "langchain_qdrant", "groq", "fastapi"
@@ -87,7 +137,7 @@ def validate_environment() -> None:
         except ImportError:
             errors.append(f"Missing required pip package: {pkg}")
             
-    # 3. Module 1 artifacts
+    # Verify Module 1 Language Detection model pickles
     mod1_vectorizer = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_vectorizer.pkl")
     mod1_classifier = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_model.pkl")
     if not os.path.exists(mod1_vectorizer):
@@ -95,7 +145,7 @@ def validate_environment() -> None:
     if not os.path.exists(mod1_classifier):
         errors.append(f"Module 1 classifier pickle not found at: {mod1_classifier}")
         
-    # 4. Module 2 model directory and adapter config
+    # Verify Module 2 Emotion Classification model adapter config
     mod2_dir = os.path.join(base_dir, "artifacts", "emotion_classifier")
     mod2_config = os.path.join(mod2_dir, "adapter_config.json")
     if not os.path.exists(mod2_dir):
@@ -103,7 +153,7 @@ def validate_environment() -> None:
     elif not os.path.exists(mod2_config):
         errors.append(f"Module 2 adapter config not found at: {mod2_config}")
         
-    # 5. Qdrant collection check
+    # Verify Qdrant database collection presence
     if qdrant_ok:
         try:
             from qdrant_client import QdrantClient
@@ -114,28 +164,40 @@ def validate_environment() -> None:
             
             collections = [c.name for c in client.get_collections().collections]
             if "mental_health" not in collections:
-                print("Notice: Qdrant collection 'mental_health' not found. It will be created and populated on startup.")
+                print("Notice: Qdrant collection 'mental_health' not found. It will be created on startup.")
             else:
                 count_info = client.count(collection_name="mental_health")
                 if count_info.count == 0:
                     print("Notice: Qdrant collection 'mental_health' is empty. It will be populated on startup.")
             client.close()
         except Exception as e:
-            errors.append(f"Failed to connect to Qdrant or query collection 'mental_health': {e}")
+            errors.append(f"Failed to connect to Qdrant or query collection: {e}")
             
     if errors:
         print("\n" + "="*80, file=sys.stderr)
-        print("ENVIRONMENT VALIDATION FAILED on startup. Please resolve the following issues:", file=sys.stderr)
+        print("ENVIRONMENT VALIDATION FAILED on startup. Please resolve these issues:", file=sys.stderr)
         for err in errors:
             print(f" - {err}", file=sys.stderr)
         print("="*80 + "\n", file=sys.stderr)
         sys.exit(1)
 
 
+# ------------------------------------------------------------------------------
+# 4. FastAPI Application Setup
+# ------------------------------------------------------------------------------
 app = FastAPI(
-    title="Mental Health RAG Chatbot",
-    description="A FastAPI chatbot that uses MentalHealthRAG for retrieval-augmented mental health responses.",
-    version="0.1.0",
+    title="Serene AI - Empowering Mental Health Support API",
+    description=(
+        "🌿 **Serene AI API Engine**\n\n"
+        "An advanced, multi-layered mental health support backend leveraging:\n"
+        "- **BGE Reranker V2 M3** & BM25 Hybrid Retrieval\n"
+        "- **XLM-RoBERTa** & custom local models for multilingual emotion/intent classification\n"
+        "- **GPT OSS 20B** empathetic grounding\n\n"
+        "All responses are clinically grounded in professional counseling case files."
+    ),
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -146,40 +208,61 @@ app.mount(
     name="static",
 )
 
+# Global RAG Instance
 rag: MentalHealthRAG | None = None
 
 
+# ------------------------------------------------------------------------------
+# 5. Lifespan Event Listeners
+# ------------------------------------------------------------------------------
 @app.on_event("startup")
 async def startup_event() -> None:
+    """Runs concurrent startup model loading routines."""
     validate_environment()
-    global rag
-    rag = MentalHealthRAG()
-    documents = rag.load_and_preprocess()
-    rag.setup_retriever(documents)
+    import asyncio
+    
+    async def load_rag():
+        global rag
+        rag = MentalHealthRAG()
+        documents = await asyncio.to_thread(rag.load_and_preprocess)
+        await asyncio.to_thread(rag.setup_retriever, documents)
+        print("--> [RAG Setup] Vector store and retrievers preloaded successfully.")
+
+    from .router import preload_models
+    
+    # Preload RAG and classifier/translator models concurrently
+    await asyncio.gather(
+        load_rag(),
+        preload_models()
+    )
 
 
 @app.on_event("shutdown")
 async def shutdown_event() -> None:
+    """Closes connections cleanly on shutdown."""
     global rag
     if rag is not None:
         rag.close()
 
 
+# ------------------------------------------------------------------------------
+# 6. HTTP Endpoints
+# ------------------------------------------------------------------------------
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={}
-    )
+    """Serves the main Serene AI empathetic chat window UI."""
+    return templates.TemplateResponse(request=request, name="index.html")
+
 
 @app.get("/health")
 async def health_check() -> dict:
+    """System health check endpoint."""
     return {"status": "ok"}
 
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
+    """Processes queries through the routing and grounding RAG pipeline."""
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query text is required.")
 

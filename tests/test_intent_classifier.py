@@ -36,40 +36,32 @@ def test_intent_classifier_embedding_match():
         assert res.classifier == "embedding"
 
 def test_intent_classifier_llm_fallback_success():
-    """Verify cascading to Ollama fallback when embedding classifier returns None."""
+    """Verify cascading to Groq fallback when embedding classifier returns None."""
     classifier = IntentClassifier()
     
-    with patch.object(classifier, "_embedding_classifier", return_value=None), \
-         patch("src.modules.intent_classifier.urlopen") as mock_urlopen:
-        
-        # Mock successful Ollama response returning json
-        mock_response = MagicMock()
-        mock_json = json_bytes = b'{"message": {"content": "{\\"type\\": \\"out_of_scope\\", \\"confidence\\": 0.95}"}}'
-        mock_response.read.return_value = mock_json
-        mock_urlopen.return_value.__enter__.return_value = mock_response
+    with patch.object(classifier, "_embedding_classifier", return_value=None):
+        # Mock groq_client
+        mock_groq = MagicMock()
+        mock_choice = MagicMock()
+        mock_choice.message.content = '{"type": "out_of_scope", "confidence": 0.95}'
+        mock_groq.chat.completions.create.return_value.choices = [mock_choice]
+        classifier.groq_client = mock_groq
         
         res = classifier.classify("What is Python?")
         assert res.type == "out_of_scope"
         assert res.confidence == 0.95
         assert res.classifier == "llm"
 
-def test_intent_classifier_heuristic_fallback():
-    """Verify heuristic fallback triggers when Ollama call fails or times out."""
+def test_intent_classifier_default_fallback():
+    """Verify default fallback triggers when Groq is not configured or fails."""
     classifier = IntentClassifier()
+    classifier.groq_client = None
     
-    with patch.object(classifier, "_embedding_classifier", return_value=None), \
-         patch("src.modules.intent_classifier.urlopen", side_effect=TimeoutError("Connection timed out")):
-        
-        # Query containing mental health signals -> heuristic should classify as asking_mental_health_question
-        res = classifier.classify("I'm feeling very sad and stressed out")
-        assert res.type == "asking_mental_health_question"
-        assert res.confidence == 0.72
+    with patch.object(classifier, "_embedding_classifier", return_value=None):
+        res = classifier.classify("What is Python?")
+        assert res.type == "general"
+        assert res.confidence == 0.5
         assert res.classifier == "llm"
-        
-        # General query -> heuristic fallback
-        res_general = classifier.classify("hello there")
-        assert res_general.type == "general"
-        assert res_general.confidence == 0.55
 
 def test_intent_router():
     """Verify IntentRouter routes general, out_of_scope, and mental health questions correctly."""

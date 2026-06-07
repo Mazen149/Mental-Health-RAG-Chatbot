@@ -56,7 +56,7 @@ def classify_emotion(text: str) -> list[str]:
         return [emotion]
 
 
-def classify_intent(text: str) -> str:
+def classify_intent(text: str, language: str = "English") -> str:
     """
     Classifies intent and returns the category name as a string (e.g. 'asking_mental_health_question').
     Compatible with router.py.
@@ -64,5 +64,5 @@ def classify_intent(text: str) -> str:
     global _intent_classifier
     if _intent_classifier is None:
         _intent_classifier = IntentClassifier()
-    res = _intent_classifier.classify(text)
+    res = _intent_classifier.classify(text, language)
     return res.type

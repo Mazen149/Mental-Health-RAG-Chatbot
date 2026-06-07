@@ -1,8 +1,22 @@
+"""
+================================================================================
+SERENE AI — CONVERSATIONAL ROUTING ENGINE
+================================================================================
+Routes queries dynamically using conversational fast-paths (regex checking),
+crisis safety bypass triggers, and fallbacks to full semantic RAG logic.
+================================================================================
+"""
+
+import asyncio
 import os
 from pathlib import Path
+import re
+
 from dotenv import load_dotenv
 
-# Dynamically locate the project root by searching upwards for .env or pyproject.toml
+# ------------------------------------------------------------------------------
+# 1. Environment Loading & Project Root Identification
+# ------------------------------------------------------------------------------
 _CURRENT_DIR = Path(__file__).resolve().parent
 _PROJECT_ROOT = None
 for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
@@ -18,15 +32,23 @@ if _ENV_PATH.exists():
 else:
     load_dotenv()
 
-import re
-import asyncio
-from .modules import detect_language, classify_emotion, classify_intent
-from .modules.rag import build_system_prompt
-
-# Read toggle for query translation (default is False, so we retrieve directly)
+# Read toggle for query translation
 ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in ("true", "1", "yes")
 
-def safe_print(msg: str):
+# Local project imports
+from .modules import detect_language, classify_emotion, classify_intent
+from .modules.multilingual_patterns import (
+    GREETING_REGEX, GOODBYE_REGEX, GRATITUDE_REGEX,
+    GREETING_RESPONSES, GOODBYE_RESPONSES, GRATITUDE_RESPONSES,
+    CRITICAL_CRISIS_RESPONSES, OUT_OF_SCOPE_RESPONSES
+)
+from .modules.rag import build_system_prompt, detect_crisis
+
+# ------------------------------------------------------------------------------
+# 2. Global Utilities & Helper Functions
+# ------------------------------------------------------------------------------
+def safe_print(msg: str) -> None:
+    """Safe console logging print that handles UnicodeEncodeError on Windows command line."""
     try:
         print(msg)
     except UnicodeEncodeError:
@@ -35,89 +57,51 @@ def safe_print(msg: str):
         except Exception:
             pass
 
-def translate_to_english(text: str, client) -> str:
+# Translation Model Pipeline Global
+_translator_pipeline = None
+
+
+def translate_to_english(text: str, client=None) -> str:
     """
-    Translates non-English text to English using Groq LLM.
+    Translates non-English text to English using a local Helsinki-NLP translation transformer.
+    Safely bypasses translation for pure ASCII inputs.
     """
+    global _translator_pipeline
     try:
-        response = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "You are a precise translator. Translate the user query into English. Output ONLY the English translation. Do not write any conversational filler, notes, or markdown."},
-                {"role": "user", "content": text}
-            ],
-            model="openai/gpt-oss-20b",
-            temperature=0.0,
-            max_tokens=150
-        )
-        translated = response.choices[0].message.content.strip()
-        if translated:
-            return translated
-        return text
+        # Fast path: if the text is pure ASCII, it is already English
+        if all(ord(c) < 128 for c in text):
+            return text
+
+        if _translator_pipeline is None:
+            from transformers import pipeline
+            safe_print("--> [Translator Setup] Initializing local multilingual translation pipeline...")
+            _translator_pipeline = pipeline(
+                "translation",
+                model="Helsinki-NLP/opus-mt-mul-en",
+                device=-1  # Force CPU execution
+            )
+        
+        result = _translator_pipeline(text)
+        translated = result[0]['translation_text'].strip()
+        return translated if translated else text
     except Exception as e:
-        safe_print(f"Error in translating query to English: {e}")
+        safe_print(f"--> [Translator Error] Local translation failed: {e}")
         return text
 
 
-GREETING_REGEX = re.compile(
-    r"^(hi|hello|hey|greetings|good\s*(morning|afternoon|evening)|مرحبا|أهلا|أهلاً|السلام\s*عليكم|سلام\s*عليكم|bonjour|hola|salut|ciao|yo|hiya|welcome)(\s+.*)?$", 
-    re.IGNORECASE
-)
+def get_direct_greeting(language: str) -> str:
+    """Returns a direct friendly greeting response in the user's language."""
+    return GREETING_RESPONSES.get(language, GREETING_RESPONSES["English"])
 
-GOODBYE_REGEX = re.compile(
-    r"^(bye|goodbye|see\s+you|take\s+care|مع\s*السلامة|إلى\s*اللقاء|وداعا|وداعاً|au\s+revoir|adiós|adios|nos\s+vemos|ciao|adieu)(\s+.*)?$",
-    re.IGNORECASE
-)
 
-GRATITUDE_REGEX = re.compile(
-    r"^(thanks?|thank\s+you|thx|شكر|شكراً|جزاك|تسلم|merci|gracias|danke|obrigado)(\s+.*)?$",
-    re.IGNORECASE
-)
+def get_direct_goodbye(language: str) -> str:
+    """Returns a direct friendly goodbye response in the user's language."""
+    return GOODBYE_RESPONSES.get(language, GOODBYE_RESPONSES["English"])
 
-def get_direct_greeting(query: str) -> str:
-    """
-    Returns a direct friendly greeting response in the user's language.
-    """
-    # Detect language using character set checks for fast response
-    lower_query = query.lower()
-    if any(char in lower_query for char in "أبتثجحخدذرزسشصضطظعغفقكلمنهوي"):
-        return "مرحباً! أنا هنا لدعمك ومساعدتك. كيف يمكنني مساعدتك اليوم؟"
-    if "bonjour" in lower_query or "salut" in lower_query or "comment ça va" in lower_query:
-        return "Bonjour ! Je suis là pour vous soutenir. Comment puis-je vous aider aujourd'hui ?"
-    if "hola" in lower_query or "buenos dias" in lower_query:
-        return "¡Hola! Estoy aquí para apoyarte. ¿Cómo puedo ayudarte hoy?"
-    if "ciao" in lower_query:
-        return "Ciao! Sono qui per supportarti. Come posso aiutarti oggi?"
-    return "Hello! I am here to support you. How can I help you today?"
 
-def get_direct_goodbye(query: str) -> str:
-    """
-    Returns a direct friendly goodbye response in the user's language.
-    """
-    lower_query = query.lower()
-    if any(char in lower_query for char in "أبتثجحخدذرزسشصضطظعغفقكلمنهوي"):
-        return "مع السلامة! أتمنى لك يوماً هادئاً ومليئاً بالسكينة. أنا هنا دائماً إذا احتجت للدعم."
-    if "au revoir" in lower_query or "adieu" in lower_query:
-        return "Au revoir ! Prenez soin de vous. Je suis là si vous avez besoin de soutien."
-    if "adiós" in lower_query or "adios" in lower_query or "nos vemos" in lower_query:
-        return "¡Adiós! Cuídate mucho. Estoy aquí si necesitas apoyo."
-    if "ciao" in lower_query:
-        return "Ciao! Prenditi cura di te. Sono qui se hai bisogno di supporto."
-    return "Goodbye! Take care of yourself. I am always here if you need support."
-
-def get_direct_gratitude(query: str) -> str:
-    """
-    Returns a direct warm gratitude acknowledgement in the user's language.
-    """
-    lower_query = query.lower()
-    if any(char in lower_query for char in "أبتثجحخدذرزسشصضطظعغفقكلمنهوي"):
-        return "العفو! يسعدني أنني استطعت مساعدتك. لا تتردد في العودة في أي وقت تحتاج فيه إلى الدعم."
-    if "merci" in lower_query:
-        return "De rien ! Je suis heureux d'avoir pu vous aider. N'hésitez pas à revenir si vous avez besoin de soutien."
-    if "gracias" in lower_query:
-        return "¡De nada! Me alegra haber podido ayudarte. No dudes en volver si necesitas apoyo."
-    if "danke" in lower_query:
-        return "Gern geschehen! Es freut mich, dass ich helfen konnte. Kommen Sie jederzeit wieder."
-    return "You're welcome! I'm glad I could help. Don't hesitate to come back anytime you need support."
+def get_direct_gratitude(language: str) -> str:
+    """Returns a direct warm gratitude acknowledgement in the user's language."""
+    return GRATITUDE_RESPONSES.get(language, GRATITUDE_RESPONSES["English"])
 
 async def route_query(query: str, rag_instance) -> dict:
     """
@@ -131,34 +115,49 @@ async def route_query(query: str, rag_instance) -> dict:
     OUTPUT: dict with answer, resources, and optional metadata fields
     """
     # =============================================
-    # LAYER 1: Regex Fast-Path for Conversational Intents
+    # 0. LANGUAGE & CRISIS PRE-DETECTION (takes < 1ms locally)
     # =============================================
-    cleaned = re.sub(r"[^\w\s\u0621-\u064A]", "", query).strip()
+    query_words = query.strip().split()
+    query_for_lang = query
+    if len(query_words) < 5:
+        query_for_lang = f"/p /p /p /p {query.strip()} /p /p /p /p" # Pad short queries to improve language detection accuracy with more context
     
-    if GREETING_REGEX.match(cleaned):
-        safe_print(f"DEBUG: [Layer 1 Regex] Matched greeting")
+    try:
+        # Run local TF-IDF model synchronously (takes <1ms)
+        language = detect_language(query_for_lang)
+    except Exception as e:
+        safe_print(f"Error in local language detection: {e}")
+        language = "English"
+
+    # =============================================
+    # LAYER 1: Regex Fast-Path for Conversational Intents (20 languages)
+    # =============================================
+    cleaned = query.strip()
+    
+    if GREETING_REGEX.match(cleaned) and len(cleaned.split()) <= 2:
+        safe_print("--> [Router] Matched greeting intent via Layer 1 regex.")
         return {
-            "answer": get_direct_greeting(query),
+            "answer": get_direct_greeting(language),
             "resources": [],
             "language": None,
             "emotion": None,
             "intent": "greeting"
         }
     
-    if GOODBYE_REGEX.match(cleaned):
-        safe_print(f"DEBUG: [Layer 1 Regex] Matched goodbye")
+    if GOODBYE_REGEX.match(cleaned) and len(cleaned.split()) <= 3:
+        safe_print("--> [Router] Matched goodbye intent via Layer 1 regex.")
         return {
-            "answer": get_direct_goodbye(query),
+            "answer": get_direct_goodbye(language),
             "resources": [],
             "language": None,
             "emotion": None,
             "intent": "goodbye"
         }
     
-    if GRATITUDE_REGEX.match(cleaned):
-        safe_print(f"DEBUG: [Layer 1 Regex] Matched gratitude")
+    if GRATITUDE_REGEX.match(cleaned) and len(cleaned.split()) <= 3:
+        safe_print("--> [Router] Matched gratitude intent via Layer 1 regex.")
         return {
-            "answer": get_direct_gratitude(query),
+            "answer": get_direct_gratitude(language),
             "resources": [],
             "language": None,
             "emotion": None,
@@ -166,46 +165,56 @@ async def route_query(query: str, rag_instance) -> dict:
         }
 
     # =============================================
-    # LAYER 2: LLM Intent Classification (parallel with lang + emotion)
+    # LAYER 2: Parallel Intent & Emotion Classification
     # =============================================
-    query_words = query.strip().split()
-    query_for_lang = query
-    if len(query_words) < 5:
-        query_for_lang = f"/p /p /p /p {query.strip()} /p /p /p /p"
-
-    intent_task = asyncio.to_thread(classify_intent, query)
-    lang_task = asyncio.to_thread(detect_language, query_for_lang)
+    intent_task = asyncio.to_thread(classify_intent, query, language)
     emotion_task = asyncio.to_thread(classify_emotion, query)
     
     try:
-        intent, language, emotions = await asyncio.gather(intent_task, lang_task, emotion_task)
+        intent, emotions = await asyncio.gather(intent_task, emotion_task)
     except Exception as e:
-        safe_print(f"Error in parallel classification: {e}")
+        safe_print(f"--> [Router Error] Parallel classification failed: {e}")
         intent = "asking_mental_health_question"
-        language = "English"
         emotions = ["Sadness"]
 
-    safe_print(f"DEBUG: [Layer 2 LLM] Classified intent: {intent}")
-    safe_print(f"DEBUG: Language detection -> Detected: {language}")
-    safe_print(f"DEBUG: Emotion classification -> {emotions}")
+    safe_print(f"--> [Router] Layer 2 LLM Intent: {intent}")
+    safe_print(f"--> [Router] Language Detected: {language}")
+    safe_print(f"--> [Router] Emotions Classified: {emotions}")
 
     # Handle query translation if enabled and detected language is not English
     query_en = query
     if ENABLE_TRANSLATION and language != "English":
-        safe_print(f"DEBUG: Translating query from {language} to English...")
-        query_en = translate_to_english(query, rag_instance.client)
-        safe_print(f"DEBUG: Translated query: '{query_en}'")
+        safe_print(f"--> [Router] Translating query from {language} to English...")
+        query_en = translate_to_english(query)
+        safe_print(f"--> [Router] Translated query: '{query_en}'")
 
     # =============================================
     # ROUTING LOGIC
     # =============================================
-    if intent == "asking_mental_health_question":
+    if intent == "crisis":
+        # Critical crisis detected -> Return localized safety template response
+        safe_print("--> [Router] Classified intent as CRISIS. Routing to localized safety template.")
+        crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
+        return {
+            "answer": crisis_msg,
+            "resources": [],
+            "language": language,
+            "emotion": None,
+            "intent": "crisis"
+        }
+
+    elif intent == "asking_mental_health_question":
         # Mental Health Topic -> Run full RAG pipeline
-        safe_print("--> Routing to Mental Health Topic pipeline...")
+        safe_print("--> [Router] Routing to full Mental Health grounding RAG pipeline...")
         system_prompt = build_system_prompt(emotions, language, query)
         
         # Run synchronous RAG query in a thread to avoid blocking the event loop
-        result = await asyncio.to_thread(rag_instance.query, query_en, system_prompt)
+        result = await asyncio.to_thread(
+            rag_instance.query, 
+            user_query=query, 
+            system_prompt=system_prompt, 
+            translated_query=query_en
+        )
         return {
             "answer": result["answer"],
             "resources": result.get("resources", []),
@@ -216,39 +225,85 @@ async def route_query(query: str, rag_instance) -> dict:
         
     elif intent in ["greeting", "goodbye", "gratitude"]:
         # Conversational intent caught by LLM (not regex) -> Use template responses
-        safe_print(f"--> Routing to Conversational support ({intent}) via LLM detection...")
+        safe_print(f"--> [Router] Routing to conversational template ({intent}) via Layer 2 fallback.")
         
         if intent == "greeting":
-            answer = get_direct_greeting(query)
+            answer = get_direct_greeting(language)
         elif intent == "goodbye":
-            answer = get_direct_goodbye(query)
+            answer = get_direct_goodbye(language)
         else:  # gratitude
-            answer = get_direct_gratitude(query)
+            answer = get_direct_gratitude(language)
             
         return {
             "answer": answer,
             "resources": [],
             "language": language,
-            "emotion": emotions,
+            "emotion": None,
             "intent": intent
         }
         
     else:  # out_of_scope
         # Off-Topic -> Polite redirect response in user's language
-        safe_print("--> Routing to Out-of-Scope redirect response...")
+        safe_print("--> [Router] Routing to Out-of-Scope redirect response.")
         emotions = []
-        redirect_prompts = {
-            "Arabic": "أنا هنا لمساعدتك في الأسئلة المتعلقة بالصحة النفسية والعاطفية فقط. هل هناك أي موضوع متعلق بسلامتك النفسية ترغب في التحدث عنه؟",
-            "French": "Je suis un assistant dédié au soutien en santé mentale. Je ne peux répondre qu'aux questions liées au bien-être psychologique. Comment puis-je vous aider dans ce domaine ?",
-            "Spanish": "Soy un asistente de apoyo para la salud mental. Solo puedo responder a preguntas relacionadas con el bienestar emocional. ¿Cómo puedo ayudarte hoy en este ámbito?",
-            "German": "Ich bin ein Assistent für mentale Gesundheit. Ich kann nur Fragen beantworten, die sich auf das emotionale Wohlbefinden beziehen. Wie kann ich Sie heute in diesem Bereich unterstützen?",
-            "English": "I am a dedicated mental health support assistant. I can only assist with questions related to emotional and psychological well-being. How can I support you in that area today?"
-        }
-        answer = redirect_prompts.get(language, redirect_prompts["English"])
+        answer = OUT_OF_SCOPE_RESPONSES.get(language, OUT_OF_SCOPE_RESPONSES["English"])
         return {
             "answer": answer,
             "resources": [],
             "language": language,
-            "emotion": emotions,
+            "emotion": None,
             "intent": intent
         }
+
+
+async def preload_models():
+    """
+    Preloads all ML models (language detector, emotion classifier, intent classifier, and translator)
+    concurrently on startup to avoid request-time latency spikes.
+    """
+    import asyncio
+    from .modules import detect_language, classify_emotion, classify_intent
+    
+    # Define tasks for each model loading
+    async def load_detector():
+        try:
+            # Triggers lazy initialization
+            await asyncio.to_thread(detect_language, "hello")
+            safe_print("--> Language detector model preloaded successfully.")
+        except Exception as e:
+            safe_print(f"Failed to preload language detector: {e}")
+
+    async def load_emotion():
+        try:
+            # Triggers lazy initialization
+            await asyncio.to_thread(classify_emotion, "hello")
+            safe_print("--> Emotion classifier model preloaded successfully.")
+        except Exception as e:
+            safe_print(f"Failed to preload emotion classifier: {e}")
+
+    async def load_intent():
+        try:
+            # Triggers lazy initialization
+            await asyncio.to_thread(classify_intent, "hello")
+            safe_print("--> Intent classifier model preloaded successfully.")
+        except Exception as e:
+            safe_print(f"Failed to preload intent classifier: {e}")
+
+    async def load_translator():
+        try:
+            # Triggers lazy initialization
+            if ENABLE_TRANSLATION:
+                await asyncio.to_thread(translate_to_english, "hola")
+                safe_print("--> Translator pipeline preloaded successfully.")
+            else:
+                safe_print("--> Translator preloading skipped (ENABLE_TRANSLATION=False).")
+        except Exception as e:
+            safe_print(f"Failed to preload translator: {e}")
+
+    safe_print("--> Starting asynchronous preloading of classifiers and translator...")
+    await asyncio.gather(
+        load_detector(),
+        load_emotion(),
+        load_intent(),
+        load_translator()
+    )

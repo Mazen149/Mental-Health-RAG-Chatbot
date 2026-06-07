@@ -257,17 +257,15 @@ class MentalHealthRAG:
             except Exception:
                 pass
 
-        texts = [doc.page_content for doc in docs]
         try:
-            response = self.rerank_client.post(
-                json={"query": query, "texts": texts, "top_n": len(texts)},
+            # Query Hugging Face reranker via public text_classification API using list of dicts
+            payload = [{"text": query, "text_pair": doc.page_content} for doc in docs]
+            response = self.rerank_client.text_classification(
+                text=payload,
                 model="BAAI/bge-reranker-v2-m3",
             )
-            results = json.loads(response)
-            scores = [0.0] * len(docs)
-            for item in results:
-                scores[item["index"]] = item["score"]
-            return scores
+            # Extract scores from the list of TextClassificationOutputElement objects
+            return [float(item.score) for item in response]
         except Exception as e:
             print(f"Reranker batch API error: {e}")
             # Fallback: descending order scores

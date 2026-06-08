@@ -42,7 +42,7 @@ class EmotionClassifier:
         hf_token = os.getenv("HF_TOKEN")
 
         base_model = AutoModelForSequenceClassification.from_pretrained(
-            "xlm-roberta-base",
+            os.getenv("EMOTION_BASE_MODEL", "xlm-roberta-base"),
             num_labels=len(EMOTION_MAP),
             dtype=torch.float32,
             ignore_mismatched_sizes=True,

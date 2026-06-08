@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import MagicMock, patch
 import numpy as np
 from src.router import route_query, get_direct_greeting
-from src.modules.rag import build_system_prompt, detect_crisis
+from src.modules.rag import detect_crisis
 
 class TestRouter(unittest.IsolatedAsyncioTestCase):
 
@@ -117,21 +117,7 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(detect_crisis("I want to end my life"))
         self.assertFalse(detect_crisis("I am feeling a bit stressed from work"))
 
-    def test_build_system_prompt_has_tone_directives(self):
-        """Verify that system prompt includes custom tone directives based on emotion list."""
-        prompt = build_system_prompt(["Sadness", "Anger"], "English", "I am feeling down")
-        self.assertIn("For Sadness: Validate their pain", prompt)
-        self.assertIn("For Anger: Remain completely calm", prompt)
-        self.assertNotIn("For Fear: Focus on safety", prompt)
-        self.assertIn("English", prompt)
 
-    def test_build_system_prompt_includes_crisis_helpline(self):
-        """Verify that helpline message is appended to the system prompt in crisis cases."""
-        prompt = build_system_prompt(["Fear"], "English", "I want to kill myself")
-        self.assertIn("Suicide & Crisis Lifeline at 988", prompt)
-
-        prompt_ar = build_system_prompt(["Fear"], "Arabic", "أريد الانتحار")
-        self.assertIn("الاتصال بخط المساعدة الوطني للسلامة النفسية", prompt_ar)
 
     @patch('src.router.detect_language')
     @patch('src.router.classify_emotion')

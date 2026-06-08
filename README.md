@@ -4,7 +4,8 @@
   <img src="https://img.shields.io/badge/Python-3.12-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
   <img src="https://img.shields.io/badge/FastAPI-0.111.0-green.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
   <img src="https://img.shields.io/badge/Qdrant-1.18.0-red.svg?style=for-the-badge&logo=qdrant&logoColor=white" alt="Qdrant" />
-  <img src="https://img.shields.io/badge/HuggingFace-Inference%20API-orange.svg?style=for-the-badge&logo=huggingface&logoColor=white" alt="HuggingFace" />
+  <img src="https://img.shields.io/badge/LangSmith-Observability-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="LangSmith" />
+  <img src="https://img.shields.io/badge/DSPy-Prompt%20Programming-lightgrey.svg?style=for-the-badge&logo=python&logoColor=blue" alt="DSPy" />
   <img src="https://img.shields.io/badge/Groq-LLM%20API-yellow.svg?style=for-the-badge&logo=google&logoColor=black" alt="Groq LLM" />
 </p>
 
@@ -62,10 +63,10 @@ graph TD
     
     %% RAG Engine Pipeline
     RAGEngine --> HybridRetrieval["Hybrid Ensemble Retrieval: BM25 + Qdrant DB with BGE Embeddings"]
-    HybridRetrieval --> Reranker["Batch API Reranking: BGE Reranker V2 M3"]
+    HybridRetrieval --> Reranker["Local Reranking: Cosine Similarity Scoring"]
     Reranker --> BuildPrompt["Build Prompt: Adaptive Emotion-Tone & Helpline Directives"]
     BuildPrompt --> HistoryPruning["Optimized History Injection: Roll last 3 turns / 6 messages"]
-    HistoryPruning --> GroqLLM["Groq LLM Generation: GPT-OSS-20B"]
+    HistoryPruning --> GroqLLM["DSPy Generation: Groq LLM GPT-OSS-20B"]
     GroqLLM --> Output
 ```
 
@@ -83,9 +84,13 @@ graph TD
 *   **📚 Chunked RAG Data Pipeline**:
     *   Groups clinician responses by unique normalized questions, merges them, and truncates to 750 words.
     *   Splits long merged responses into optimized chunks using `RecursiveCharacterTextSplitter` (chunk size = 500, overlap = 100) to find the most relevant portion, preventing context dilution and improving grounding precision.
-*   **🔍 BGE Hybrid Retrieval & Reranking**:
-    *   Retrieves the top `k=10` relevant mental health articles/contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55) using `BAAI/bge-small-en-v1.5` embeddings.
-    *   Applies a batch **BGE Reranker V2 M3** (`BAAI/bge-reranker-v2-m3`) to select the top 3 most relevant contexts.
+*   **🔍 Hybrid Retrieval & Local Reranking**:
+    *   Retrieves the top relevant mental health contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55).
+    *   Applies **Cosine Similarity Scoring** locally using query embeddings to precisely filter the top 3 most relevant contexts without relying on external APIs.
+*   **🧠 DSPy Prompt Optimization**:
+    *   Uses **DSPy** to programmatically define signatures and optimize LLM calls, ensuring structured, empathetic, and highly grounded generation without brittle prompt engineering.
+*   **👁️ LangSmith Observability**:
+    *   End-to-end tracing integrated across the pipeline (from Router logic to DSPy LLM generation) to monitor latency, track costs, and evaluate output quality in real-time.
 *   **💬 Optimized Rolling Conversation History**:
     *   Tracks conversation history on both the client (frontend UI) and server (backend payload).
     *   Prunes history dynamically to keep only the last 3 turns (last 6 messages) to maintain context and continuity while keeping the context window small, fast, and cost-effective.
@@ -174,19 +179,27 @@ Mental-Health-RAG-Chatbot/
 Create a `.env` file in the root directory and configure the following variables:
 
 ```env
-GROQ_API_KEY=YOUR_GROQ_API_KEY_HERE
-HF_TOKEN=YOUR_HF_TOKEN_HERE
+GROQ_API_KEY=your_groq_api_key_here
+HF_TOKEN=your_hf_token_here
 
-# Qdrant Settings (Leave empty to use local database under qdrant_db/)
+# Qdrant Database Settings
 QDRANT_URL=
 QDRANT_API_KEY=
+QDRANT_COLLECTION_NAME=mental_health
 
-# Translation Settings
+# Model & Translation Settings
 ENABLE_TRANSLATION=False
-
-# Model Settings (Optional fallback is openai/gpt-oss-20b)
 GROQ_GENERATION_MODEL=openai/gpt-oss-20b
 GROQ_CLASSIFIER_MODEL=openai/gpt-oss-20b
+EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
+RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+EMOTION_BASE_MODEL=xlm-roberta-base
+
+# LangSmith Observability (Optional)
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
+LANGCHAIN_API_KEY="your_langsmith_api_key_here"
+LANGCHAIN_PROJECT="serene_ai"
 ```
 
 ---

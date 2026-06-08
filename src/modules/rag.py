@@ -8,12 +8,14 @@ reranking via Hugging Face inference API, and LLM empathetic grounding.
 """
 
 import json
+from langsmith import traceable
 import os
 from pathlib import Path
 import pickle
 import re
 from typing import List
 
+import dspy
 from dotenv import load_dotenv
 from groq import Groq
 from huggingface_hub import InferenceClient
@@ -56,10 +58,55 @@ _DEFAULT_QDRANT_PATH = str(_PROJECT_ROOT / "qdrant_db")
 _DEFAULT_CACHE_PATH = str(_PROJECT_ROOT / "artifacts" / "processed_docs.pkl")
 
 CRISIS_KEYWORDS = [
-    "suicide", "suicidal", "kill myself", "end my life", "self-harm", "harm myself", 
-    "cutting", "انتحار", "إنتحار", "الانتحار", "الإنتحار", "بالانتحار", "بالإنتحار",
-    "أنهي حياتي", "أقتل نفسي", "إيذاء نفسي", "خودکشی", "suicider", 
-    "me tuer", "fin à mes jours", "suicidio", "quitarme la vida", "hacerme daño"
+    # English
+    "suicide", "suicidal", "kill myself", "end my life", "self-harm", "harm myself", "cutting", "hang myself", "overdose",
+    # Arabic
+    "انتحار", "إنتحار", "الانتحار", "الإنتحار", "أنهي حياتي", "أقتل نفسي", "إيذاء نفسي", "قاتل نفسي",
+    # Urdu
+    "خودکشی", "اپنی زندگی ختم", "خود کو نقصان",
+    # Hindi
+    "आत्महत्या", "जान दे दूंगा", "खुद को नुकसान",
+    # French
+    "suicide", "me tuer", "fin à mes jours", "m'auto-mutiler", "me couper",
+    # Spanish
+    "suicidio", "quitarme la vida", "matarme", "hacerme daño", "autolesion",
+    # German
+    "selbstmord", "freitod", "leben beenden", "mir wehtun", "ritzen",
+    # Italian
+    "suicidio", "uccidermi", "farla finita", "autolesionismo", "farmi del male",
+    # Portuguese
+    "suicídio", "me matar", "tirar minha vida", "me cortar", "me automotilar",
+    # Russian
+    "самоубийство", "убить себя", "покончить с собой", "нанести себе вред", "порезать себя",
+    # Turkish
+    "intihar", "canıma kıymak", "kendimi öldürmek", "kendime zarar",
+    # Japanese
+    "自殺", "命を絶つ", "死にたい", "自傷", "自分を傷つける",
+    # Chinese
+    "自杀", "结束生命", "想死", "自残", "伤害自己",
+    # Vietnamese
+    "tự tử", "tự sát", "kết liễu cuộc đời", "hủy hoại bản thân", "tự làm đau",
+    # Polish
+    "samobójstwo", "zabić się", "odebrać sobie życie", "samookaleczanie",
+    # Dutch
+    "zelfmoord", "suïcide", "mijn leven beëindigen", "mezelf pijn doen",
+    # Bulgarian
+    "самоубийство", "да се убия", "да край на живота си", "самонараняване",
+    # Greek
+    "αυτοκτονία", "να αυτοκτονήσω", "να δώσω τέλος", "αυτοτραυματισμός",
+    # Swahili
+    "kujiua", "kumaliza maisha", "kujidhuru",
+    # Thai
+    "ฆ่าตัวตาย", "จบชีวิต", "ทำร้ายตัวเอง"
+]
+
+PROMPT_INJECTION_INDICATORS = [
+    "ignore previous instructions", "ignore above instructions", "ignore system instructions", 
+    "ignore your system prompt", "bypass your safety", "jailbreak", "do anything now", 
+    "ignore the rules", "you must now act as", "you are now a", "system bypass",
+    "تجاهل التعليمات", "تجاهل القواعد", "أنت الآن", "إلغاء تفعيل الحماية",
+    "ignorez les instructions", "tu es maintenant", "ignore las instrucciones", "ahora eres",
+    "ignoriere die anweisungen", "du bist jetzt", "ignoriere alle regeln"
 ]
 
 
@@ -76,56 +123,157 @@ def detect_crisis(query: str) -> bool:
     return any(kw in q_lower for kw in CRISIS_KEYWORDS)
 
 
-def build_system_prompt(emotions: list[str], language: str, query: str = "") -> str:
-    prompt = (
-        "You are a compassionate, professional mental health support assistant. "
-        "Your goal is to provide a supportive, empathetic, and conversational response to the user's query.\n\n"
-        
-        "CRITICAL GROUNDING RULES:\n"
-        "- You MUST use ONLY the retrieved contexts to answer the user's query. Do not answer from your own knowledge.\n"
-        f"- If the retrieved contexts do not contain enough information to answer, respond exactly with: "
-        f"'I\'m sorry, I don\'t have enough information to answer that.' (or its translation in the user\'s language: {language}).\n"
-        "- Strictly avoid inventing therapy techniques, clinical diagnoses, or medication names. Do not hallucinate.\n\n"
-        
-        "CRITICAL LANGUAGE RULES:\n"
-        f"- Our language detector suggests the user's language is: {language}.\n"
-        "- However, you MUST verify this by looking at the user's actual query text. "
-        "If the query is clearly written in a different language than the detected one, "
-        "respond in the language the query is ACTUALLY written in, not the detected language.\n"
-        "- If the retrieved contexts are in a different language, translate the relevant information from those contexts into the user's language.\n\n"
-        
-        "RESPONSE FORMAT:\n"
-        "- Keep your response concise, to exactly 3-5 sentences.\n"
-        "- Do not use bullet points or numbered lists in your response.\n"
-        "- Maintain a natural, conversational, and caring flow.\n"
-        "- You MUST cite the retrieved contexts in your answer. At the end of each statement or sentence that relies on a specific context, append the context number in square brackets, e.g. [1], [2], or [3] (corresponding to Context [1], Context [2], or Context [3] provided in the prompt). Do not create any citations other than [1], [2], or [3].\n\n"
-    )
+def detect_prompt_injection(query: str) -> bool:
+    q_lower = query.lower()
+    return any(indicator in q_lower for indicator in PROMPT_INJECTION_INDICATORS)
+
+
+def detect_medicine_query(query: str) -> bool:
+    q_lower = query.lower()
+    meds = [
+        "xanax", "prozac", "lexapro", "zoloft", "ritalin", "adderall", "valium", "ativan", 
+        "klonopin", "wellbutrin", "effexor", "cymbalta", "seroquel", "abilify", 
+        "antidepressant", "prescribe", "prescription", "psychiatrist", "psychiatry", "psychiatric",
+        "الزنكس", "البروزاك", "مضاد للاكتئاب", "وصفة طبية", "دواء", "دوا", "أدوية", "طبيب نفسي", "الطب النفسي",
+        "médicament", "médicaments", "prescrire", "ordonnance", "psychiatre",
+        "medicamento", "medicamentos", "recetar", "receta", "psiquiatra",
+        "medikament", "antidepressivum", "verschreiben", "rezept", "psychiater"
+    ]
+    return any(m in q_lower for m in meds)
+
+
+def check_medical_advice(answer: str, language: str) -> str:
+    ans_lower = answer.lower()
+    meds = [
+        "xanax", "prozac", "lexapro", "zoloft", "ritalin", "adderall", "valium", "ativan", 
+        "klonopin", "wellbutrin", "effexor", "cymbalta", "seroquel", "abilify", 
+        "antidepressant", "prescribe", "prescription", "psychiatrist",
+        "الزنكس", "البروزاك", "مضاد للاكتئاب", "وصفة طبية", "دواء", "دوا", "أدوية", "طبيب نفسي",
+        "médicament", "médicaments", "prescrire", "ordonnance",
+        "medicamento", "medicamentos", "recetar", "receta",
+        "medikament", "antidepressivum", "verschreiben", "rezept"
+    ]
+    if any(m in ans_lower for m in meds):
+        from .multilingual_patterns import MEDICAL_DISCLAIMERS
+        disclaimer = MEDICAL_DISCLAIMERS.get(language, MEDICAL_DISCLAIMERS["English"])
+        if disclaimer not in answer:
+            answer = f"{answer.rstrip()}\n\n*{disclaimer}*"
+    return answer
+
+
+
+class RetrievalRouterSignature(dspy.Signature):
+    """Classify if the user's latest query refers to previous chat history (e.g., asking about what they said, their name, their personal details, or what was discussed) and can be answered using only the chat history, or if it asks a new mental health/counseling question that requires retrieving external medical/support document resources."""
     
-    prompt += "EMOTION-ADAPTIVE TONE DIRECTIVES:\n"
-    prompt += f"The user has been detected as experiencing the following emotional state(s): {', '.join(emotions)}.\n"
-    prompt += "Adjust your tone implicitly to mirror these guidelines. Do NOT explicitly label their emotions or state 'I see you are feeling [emotion]'. Instead:\n"
+    chat_history = dspy.InputField(desc="Pruned recent chat turns between user and assistant")
+    user_query = dspy.InputField(desc="The user's latest query")
     
-    for emotion in emotions:
-        if emotion == "Sadness":
-            prompt += "- For Sadness: Validate their pain and sadness with deep warmth and gentle empathy. Hold space for their feelings. Do not try to instantly 'fix' their situation; be present and comforting.\n"
-        elif emotion == "Anger":
-            prompt += "- For Anger: Remain completely calm, objective, and non-defensive. Validate their frustration (e.g., 'It makes sense to feel frustrated when...') and avoid getting into power struggles or arguments.\n"
-        elif emotion == "Fear":
-            prompt += "- For Fear: Focus on safety and grounding. Reassure them, use soothing language, and keep any guidance slow, structured, and step-by-step.\n"
-        elif emotion == "Joy":
-            prompt += "- For Joy: Share in their positive energy with warmth and celebration. Validate their happiness and build on their strengths.\n"
-        elif emotion == "Love":
-            prompt += "- For Love: Validate their warm connections and appreciation, responding with kindness while maintaining clear, supportive, and professional boundaries.\n"
-        elif emotion == "Surprise":
-            prompt += "- For Surprise: Explore the unexpected situation with open curiosity and help them process their reaction.\n"
-            
-    if detect_crisis(query):
-        prompt += "\nCRITICAL CRISIS DETECTION PROTOCOL:\n"
-        prompt += "The user's query contains signals of self-harm or suicidal ideation. You MUST append a crisis helpline message in the user's language to your response.\n"
-        from .multilingual_patterns import CRITICAL_CRISIS_RESPONSES
-        crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
-        prompt += f"Please append exactly this message at the very end of your response: '{crisis_msg}'\n"
-    return prompt
+    route = dspy.OutputField(desc="exactly 'history_only' or 'requires_retrieval'")
+
+
+class RetrievalRouterModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.route_predict = dspy.Predict(RetrievalRouterSignature)
+
+    def forward(self, chat_history: str, user_query: str) -> str:
+        res = self.route_predict(chat_history=chat_history, user_query=user_query)
+        route_val = str(res.route).strip().lower()
+        if "history_only" in route_val:
+            return "history_only"
+        return "requires_retrieval"
+
+
+class QueryCondenserSignature(dspy.Signature):
+    """Given a chat history and the latest user question which might reference context in the chat history,
+    formulate a standalone question which can be understood without the chat history.
+    The standalone question MUST be written in English. Do NOT answer the question, just reformulate it
+    and output ONLY the standalone question."""
+    
+    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
+    user_query = dspy.InputField(desc="The latest user question/query")
+    condensed_query = dspy.OutputField(desc="A standalone question in English representing the query in history context")
+
+
+class QueryCondenserModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.condense = dspy.Predict(QueryCondenserSignature)
+
+    def forward(self, chat_history: str, user_query: str) -> str:
+        res = self.condense(chat_history=chat_history, user_query=user_query)
+        return str(res.condensed_query).strip()
+
+
+class GroundedResponseSignature(dspy.Signature):
+    """You are a compassionate, professional mental health support assistant.
+    Your goal is to provide a supportive, empathetic, and conversational response to the user's query.
+    
+    CRITICAL GROUNDING RULES:
+    - Ground your response and advice in the retrieved contexts. You should also refer to personal facts, context, or situations mentioned in the chat history.
+    - If neither the retrieved contexts nor the chat history contain enough information to address the query, respond exactly with: 'I'm sorry, I don't have enough information to answer that.' (or its translation in the user's language).
+    - Strictly avoid inventing therapy techniques, clinical diagnoses, or medication names. Do not hallucinate.
+    
+    CRITICAL LANGUAGE RULES:
+    - Respond in the language that the query is ACTUALLY written in.
+    - If the contexts are in a different language, translate the relevant information from those contexts into the user's language.
+    
+    RESPONSE FORMAT:
+    - Keep your response concise, to exactly 3-5 sentences.
+    - Do not use bullet points or numbered lists.
+    - Cite the retrieved contexts by appending the context number in square brackets, e.g. [1], [2], or [3] (corresponding to Context [1], Context [2], or Context [3]). Do not create other citations.
+    - Adjust tone implicitly according to the user's emotions and directives. Do not label their emotions explicitly.
+    """
+
+    contexts = dspy.InputField(desc="Retrieved counseling case contexts, formatted as Context [1], Context [2], Context [3]")
+    emotions = dspy.InputField(desc="User's detected emotional state and tone directives")
+    language = dspy.InputField(desc="Detected language and translation/actual query language instructions")
+    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
+    user_query = dspy.InputField(desc="The user's query/message")
+    
+    answer = dspy.OutputField(desc="Empathetic, grounded response matching language/tone directives and citations")
+
+
+class GroundedResponseModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.generate = dspy.ChainOfThought(GroundedResponseSignature)
+
+    def forward(self, contexts: str, emotions: str, language: str, chat_history: str, user_query: str) -> str:
+        res = self.generate(
+            contexts=contexts,
+            emotions=emotions,
+            language=language,
+            chat_history=chat_history,
+            user_query=user_query
+        )
+        return str(res.answer).strip()
+
+
+class GeneralConversationSignature(dspy.Signature):
+    """You are Serene AI, a compassionate, friendly, and professional mental health support assistant.
+    The user is engaging in greeting, goodbye, gratitude, or basic small talk/introductions.
+    Respond warmly, naturally, and in a friendly conversational manner in the user's language.
+    If the user has introduced themselves or mentioned their name in the history or query, acknowledge and remember it.
+    If they ask for their name, tell them their name if it was mentioned.
+    Keep your response concise, to exactly 1-3 sentences. Do not offer clinical advice here; just be warm, welcoming, and supportive.
+    """
+    
+    language = dspy.InputField(desc="The user's language")
+    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
+    user_query = dspy.InputField(desc="The user's query/greeting")
+    
+    answer = dspy.OutputField(desc="Warm, friendly conversational response in the user's language (1-3 sentences)")
+
+
+class GeneralConversationModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.respond = dspy.Predict(GeneralConversationSignature)
+
+    def forward(self, language: str, chat_history: str, user_query: str) -> str:
+        res = self.respond(language=language, chat_history=chat_history, user_query=user_query)
+        return str(res.answer).strip()
 
 
 class MentalHealthRAG:
@@ -138,10 +286,9 @@ class MentalHealthRAG:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.qdrant_path = qdrant_path
         self.cache_path = cache_path
-        self.collection_name = "mental_health"
+        self.collection_name = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")
 
-        self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
+        self.embeddings = HuggingFaceEmbeddings(model_name=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"))
         self.rerank_client = InferenceClient(
             provider="hf-inference",
             api_key=os.getenv("HF_TOKEN"),
@@ -149,7 +296,7 @@ class MentalHealthRAG:
         )
         # For testing compatibility:
         if "Mock" in type(CrossEncoder).__name__ or "MagicMock" in type(CrossEncoder).__name__:
-            self.rerank_model = CrossEncoder('BAAI/bge-reranker-v2-m3')
+            self.rerank_model = CrossEncoder(os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3"))
         else:
             self.rerank_model = None
 
@@ -161,6 +308,23 @@ class MentalHealthRAG:
         self.model_name = os.getenv("GROQ_GENERATION_MODEL", "openai/gpt-oss-20b")
         self.chunk_size = 500
         self.chunk_overlap = 100
+
+        # Initialize DSPy modules
+        groq_api_key = os.getenv("GROQ_API_KEY")
+        if groq_api_key:
+            self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
+            self.condense_module = QueryCondenserModule()
+            self.grounded_module = GroundedResponseModule()
+            self.general_module = GeneralConversationModule()
+            self.retrieval_router = RetrievalRouterModule()
+            self.client = self.lm  # keep for backwards compatibility / mock checks
+        else:
+            self.lm = None
+            self.condense_module = None
+            self.grounded_module = None
+            self.general_module = None
+            self.retrieval_router = None
+            self.client = None
 
     def load_and_preprocess(
         self,
@@ -316,28 +480,28 @@ class MentalHealthRAG:
         )
 
     def rerank_documents(self, query: str, docs: List[Document]) -> List[float]:
-        """Rerank documents using the Hugging Face batch reranking API."""
-        # Check if we have a mocked/local rerank_model (e.g. in tests)
-        if hasattr(self, "rerank_model") and self.rerank_model is not None:
-            try:
-                model_inputs = [[query, doc.page_content] for doc in docs]
-                scores = self.rerank_model.predict(model_inputs)
-                if scores is not None:
-                    return [float(s) for s in scores]
-            except Exception:
-                pass
-
+        """Rerank documents using cosine similarity of embeddings instead of a CrossEncoder."""
+        if not docs:
+            return []
+            
+        import torch.nn.functional as F
+        
         try:
-            # Query Hugging Face reranker via public text_classification API using list of dicts
-            payload = [{"text": query, "text_pair": doc.page_content} for doc in docs]
-            response = self.rerank_client.text_classification(
-                text=payload,
-                model="BAAI/bge-reranker-v2-m3",
-            )
-            # Extract scores from the list of TextClassificationOutputElement objects
-            return [float(item.score) for item in response]
+            # Get query embedding
+            query_emb = self.embeddings.embed_query(query)
+            q_tensor = torch.tensor(query_emb).unsqueeze(0) # (1, D)
+            
+            # Get document embeddings
+            docs_texts = [doc.page_content for doc in docs]
+            docs_embs = self.embeddings.embed_documents(docs_texts)
+            d_tensor = torch.tensor(docs_embs) # (N, D)
+            
+            # Calculate cosine similarity
+            cos_sim = F.cosine_similarity(q_tensor, d_tensor)
+            
+            return [float(score) for score in cos_sim.tolist()]
         except Exception as e:
-            print(f"Reranker batch API error: {e}")
+            print(f"Cosine similarity reranking error: {e}")
             # Fallback: descending order scores
             return [float(len(docs) - i) for i in range(len(docs))]
 
@@ -360,102 +524,157 @@ class MentalHealthRAG:
 
         return docs_with_scores
 
+    @traceable(name="rag_query", run_type="chain")
     def query(
         self, 
         user_query: str, 
-        system_prompt: str | None = None, 
         translated_query: str | None = None,
-        history: list | None = None
+        history: list | None = None,
+        emotions: list | None = None,
+        language: str | None = None
     ) -> dict:
         if not self.ensemble_retriever:
             return {"answer": "Retriever not set up.", "resources": []}
 
-        retrieval_query = translated_query if translated_query is not None else user_query
+        if not language:
+            language = "English"
 
-        # Condense query if history exists to make document retrieval history-aware
-        if history and len(history) > 0:
-            condense_prompt = (
-                "Given a chat history and the latest user question which might reference context in the chat history, "
-                "formulate a standalone question which can be understood without the chat history. "
-                "The standalone question MUST be written in English. Do NOT answer the question, just reformulate it "
-                "and output ONLY the standalone question."
-            )
-            condense_messages = [{"role": "system", "content": condense_prompt}]
-            
-            # Keep only the last 6 messages of history for context
-            pruned_history = history[-6:]
-            for msg in pruned_history:
-                if hasattr(msg, "role") and hasattr(msg, "content"):
-                    role = msg.role
-                    content = msg.content
-                elif isinstance(msg, dict):
-                    role = msg.get("role")
-                    content = msg.get("content")
-                else:
-                    continue
-                if role in ("user", "assistant"):
-                    condense_messages.append({"role": role, "content": content})
-            
-            condense_messages.append({"role": "user", "content": retrieval_query})
-            
-            try:
-                condense_completion = self.client.chat.completions.create(
-                    messages=condense_messages,
-                    model=self.model_name,
-                    temperature=0.0
-                )
-                condensed = condense_completion.choices[0].message.content.strip()
-                if condensed:
-                    retrieval_query = condensed
-            except Exception as e:
-                print(f"Error during query condensation: {e}")
-
-        reranked_docs = self.retrieve(retrieval_query)
-        if not reranked_docs:
-            return {"answer": "No relevant context found.", "resources": []}
-
-        resources = [
-            {
-                "score": doc.metadata.get("rerank_score", 0.0),
-                "page_content": doc.page_content,
-                "response": doc.metadata.get("response", ""),
+        # Guardrail: Check for prompt injection
+        if detect_prompt_injection(user_query):
+            from .multilingual_patterns import OUT_OF_SCOPE_RESPONSES
+            return {
+                "answer": OUT_OF_SCOPE_RESPONSES.get(language, OUT_OF_SCOPE_RESPONSES["English"]),
+                "resources": []
             }
-            for doc in reranked_docs[:3]
-        ]
 
-        top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:3])])
-        sys_prompt = system_prompt or "You are a compassionate mental health assistant. Combine context into a supportive answer."
+        # Guardrail: Check for medicine/prescription queries
+        if detect_medicine_query(user_query):
+            from .multilingual_patterns import MEDICAL_DISCLAIMERS
+            return {
+                "answer": MEDICAL_DISCLAIMERS.get(language, MEDICAL_DISCLAIMERS["English"]),
+                "resources": []
+            }
 
-        formatted_messages = [{"role": "system", "content": sys_prompt}]
+        retrieval_query = translated_query if translated_query is not None else user_query
+        route = "requires_retrieval"
+        formatted_history = ""
 
-        if history:
-            # Keep only the last 6 messages of history for a small, optimized context window
+        # Format history turns and determine routing if history exists
+        if history and len(history) > 0:
             pruned_history = history[-6:]
             for msg in pruned_history:
-                if hasattr(msg, "role") and hasattr(msg, "content"):
-                    role = msg.role
-                    content = msg.content
-                elif isinstance(msg, dict):
-                    role = msg.get("role")
-                    content = msg.get("content")
-                else:
-                    continue
+                role = msg.role if hasattr(msg, "role") else msg.get("role")
+                content = msg.content if hasattr(msg, "content") else msg.get("content")
                 if role in ("user", "assistant"):
-                    formatted_messages.append({"role": role, "content": content})
+                    formatted_history += f"{role.capitalize()}: {content}\n"
+            
+            if self.retrieval_router is not None:
+                try:
+                    with dspy.context(lm=self.lm):
+                        route = self.retrieval_router(
+                            chat_history=formatted_history,
+                            user_query=retrieval_query
+                        )
+                except Exception as e:
+                    print(f"Error during retrieval routing: {e}")
+                    route = "requires_retrieval"
 
-        formatted_messages.append({
-            "role": "user",
-            "content": f"Query: {user_query}\n\nContext:\n{top_context}"
-        })
+        if route == "history_only":
+            resources = []
+            top_context = "No external contexts retrieved. The user is asking about their personal statement or history details. Answer using only details from the chat history."
+        else:
+            # Condense query if history exists to make document retrieval history-aware
+            if history and len(history) > 0:
+                try:
+                    with dspy.context(lm=self.lm):
+                        condensed = self.condense_module(
+                            chat_history=formatted_history,
+                            user_query=retrieval_query
+                        )
+                    if condensed:
+                        retrieval_query = condensed
+                except Exception as e:
+                    print(f"Error during query condensation: {e}")
 
-        chat_completion = self.client.chat.completions.create(
-            messages=formatted_messages,
-            model=self.model_name,
-            temperature=0.7
-        )
+            reranked_docs = self.retrieve(retrieval_query)
+            if not reranked_docs:
+                return {"answer": "No relevant context found.", "resources": []}
+
+            resources = [
+                {
+                    "score": doc.metadata.get("rerank_score", 0.0),
+                    "page_content": doc.page_content,
+                    "response": doc.metadata.get("response", ""),
+                }
+                for doc in reranked_docs[:3]
+            ]
+
+            top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:3])])
+
+        if not language:
+            language = "English"
+
+        if not emotions:
+            emotions = ["Sadness"]
+
+        # Build emotional state guidelines
+        emotions_directives = f"User is experiencing: {', '.join(emotions)}.\n"
+        for emotion in emotions:
+            if emotion == "Sadness":
+                emotions_directives += "- For Sadness: Validate their pain and sadness with warmth and gentle empathy. Hold space for their feelings. Do not try to instantly 'fix' their situation; be present and comforting.\n"
+            elif emotion == "Anger":
+                emotions_directives += "- For Anger: Remain completely calm, objective, and non-defensive. Validate their frustration (e.g., 'It makes sense to feel frustrated when...') and avoid getting into power struggles.\n"
+            elif emotion == "Fear":
+                emotions_directives += "- For Fear: Focus on safety and grounding. Reassure them, use soothing language, and keep any guidance slow, structured, and step-by-step.\n"
+            elif emotion == "Joy":
+                emotions_directives += "- For Joy: Share in their positive energy with warmth and celebration. Validate their happiness and build on their strengths.\n"
+            elif emotion == "Love":
+                emotions_directives += "- For Love: Validate their warm connections and appreciation, responding with kindness while maintaining clear, supportive, and professional boundaries.\n"
+            elif emotion == "Surprise":
+                emotions_directives += "- For Surprise: Explore the unexpected situation with open curiosity and help them process their reaction.\n"
+
+        # Handle crisis response directives
+        if detect_crisis(user_query):
+            from .multilingual_patterns import CRITICAL_CRISIS_RESPONSES
+            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
+            language_instructions = f"Target response language: {language}. Respond in this language. CRITICAL CRISIS DETECTED: You MUST append exactly this helpline message at the very end of your response: '{crisis_msg}'"
+        else:
+            language_instructions = f"Target response language: {language}. Respond in this language. If user query language is different, respond in that language instead."
+
+        formatted_history = ""
+        if history:
+            pruned_history = history[-6:]
+            for msg in pruned_history:
+                role = msg.role if hasattr(msg, "role") else msg.get("role")
+                content = msg.content if hasattr(msg, "content") else msg.get("content")
+                if role in ("user", "assistant"):
+                    formatted_history += f"{role.capitalize()}: {content}\n"
+
+        try:
+            with dspy.context(lm=self.lm):
+                answer = self.grounded_module(
+                    contexts=top_context,
+                    emotions=emotions_directives,
+                    language=language_instructions,
+                    chat_history=formatted_history,
+                    user_query=user_query
+                )
+        except Exception as e:
+            print(f"Error during grounded response generation: {e}")
+            answer = "I'm sorry, I don't have enough information to answer that."
+
+        # Safety Fallback: Ensure crisis response is appended if crisis query is detected
+        if detect_crisis(user_query):
+            from .multilingual_patterns import CRITICAL_CRISIS_RESPONSES
+            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
+            if crisis_msg not in answer:
+                answer = f"{answer.rstrip()}\n\n{crisis_msg}"
+
+        # Safeguard: Apply medical disclaimer check
+        answer = check_medical_advice(answer, language)
 
         return {
-            "answer": chat_completion.choices[0].message.content,
+            "answer": answer,
             "resources": resources
         }
 
@@ -465,43 +684,26 @@ class MentalHealthRAG:
         history: list | None = None,
         language: str = "English"
     ) -> str:
-        # Build system prompt for general conversation in user's language/context
-        sys_prompt = (
-            f"You are Serene AI, a compassionate, friendly, and professional mental health support assistant.\n"
-            f"The user's language is {language}.\n"
-            f"The user is engaging in greeting, goodbye, gratitude, or basic small talk/introductions (like sharing or asking about names).\n"
-            f"Respond warmly, naturally, and in a friendly conversational manner in their language ({language}).\n"
-            f"If the user has introduced themselves or mentioned their name in the history or current query, acknowledge and remember it. "
-            f"If they ask for their name, tell them their name if it was mentioned.\n"
-            f"Keep your response concise, to exactly 1-3 sentences. Do not offer clinical advice here; just be warm, welcoming, and supportive."
-        )
-
-        formatted_messages = [{"role": "system", "content": sys_prompt}]
-
+        formatted_history = ""
         if history:
-            # Keep only the last 6 messages
             pruned_history = history[-6:]
             for msg in pruned_history:
-                if hasattr(msg, "role") and hasattr(msg, "content"):
-                    role = msg.role
-                    content = msg.content
-                elif isinstance(msg, dict):
-                    role = msg.get("role")
-                    content = msg.get("content")
-                else:
-                    continue
+                role = msg.role if hasattr(msg, "role") else msg.get("role")
+                content = msg.content if hasattr(msg, "content") else msg.get("content")
                 if role in ("user", "assistant"):
-                    formatted_messages.append({"role": role, "content": content})
+                    formatted_history += f"{role.capitalize()}: {content}\n"
 
-        formatted_messages.append({"role": "user", "content": user_query})
-
-        chat_completion = self.client.chat.completions.create(
-            messages=formatted_messages,
-            model=self.model_name,
-            temperature=0.7
-        )
-
-        return chat_completion.choices[0].message.content
+        try:
+            with dspy.context(lm=self.lm):
+                answer = self.general_module(
+                    language=language,
+                    chat_history=formatted_history,
+                    user_query=user_query
+                )
+            return answer
+        except Exception as e:
+            print(f"Error during general query generation: {e}")
+            return "Hello! I am here to support you with mental health topics. 😊"
 
     def close(self) -> None:
         if hasattr(self, "qdrant_client") and self.qdrant_client is not None:

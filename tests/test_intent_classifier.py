@@ -56,12 +56,10 @@ def test_intent_classifier_llm_fallback_success():
     classifier = IntentClassifier()
     
     with patch.object(classifier, "_embedding_classifier", return_value=None):
-        # Mock groq_client
-        mock_groq = MagicMock()
-        mock_choice = MagicMock()
-        mock_choice.message.content = '{"type": "out_of_scope", "confidence": 0.95}'
-        mock_groq.chat.completions.create.return_value.choices = [mock_choice]
-        classifier.groq_client = mock_groq
+        # Mock fallback_module
+        mock_fallback = MagicMock()
+        mock_fallback.return_value = {"type": "out_of_scope", "confidence": 0.95, "classifier": "llm"}
+        classifier.fallback_module = mock_fallback
         
         res = classifier.classify("What is Python?")
         assert res.type == "out_of_scope"
@@ -71,7 +69,8 @@ def test_intent_classifier_llm_fallback_success():
 def test_intent_classifier_default_fallback():
     """Verify default fallback triggers when Groq is not configured or fails."""
     classifier = IntentClassifier()
-    classifier.groq_client = None
+    classifier.fallback_module = None
+    classifier.lm = None
     
     with patch.object(classifier, "_embedding_classifier", return_value=None):
         res = classifier.classify("What is Python?")

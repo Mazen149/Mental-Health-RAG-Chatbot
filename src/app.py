@@ -181,7 +181,7 @@ def validate_environment() -> None:
             if "mental_health" not in collections:
                 print("Notice: Qdrant collection 'mental_health' not found. It will be created on startup.")
             else:
-                count_info = client.count(collection_name="mental_health")
+                count_info = client.count(collection_name=os.getenv("QDRANT_COLLECTION_NAME", "mental_health"))
                 if count_info.count == 0:
                     print("Notice: Qdrant collection 'mental_health' is empty. It will be populated on startup.")
             client.close()

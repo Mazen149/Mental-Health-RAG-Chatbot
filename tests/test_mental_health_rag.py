@@ -91,10 +91,8 @@ class TestMentalHealthRAG(unittest.TestCase):
         # Mock Reranker scores
         self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
 
-        # Mock Groq LLM API response
-        mock_choice = MagicMock()
-        mock_choice.message.content = "Respuesta simulada en Español"
-        self.rag.client.chat.completions.create.return_value.choices = [mock_choice]
+        # Mock DSPy grounded response output
+        self.rag.grounded_module = MagicMock(return_value="Respuesta simulada en Español")
 
         # Act
         spanish_query = "¿Cómo manejar el estrés?"
@@ -104,19 +102,17 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.assertEqual(output["answer"], "Respuesta simulada en Español")
         self.assertEqual(len(output["resources"]), 1)
         self.assertEqual(output["resources"][0]["response"], "Mock answer in English")
-        self.rag.client.chat.completions.create.assert_called_once()
+        self.rag.grounded_module.assert_called_once()
 
     def test_query_general_calls_llm(self):
         """Verify query_general correctly formats general conversation prompts and returns LLM text."""
-        mock_choice = MagicMock()
-        mock_choice.message.content = "Hello Mazen! I'm here to support you."
-        self.rag.client.chat.completions.create.return_value.choices = [mock_choice]
+        self.rag.general_module = MagicMock(return_value="Hello Mazen! I'm here to support you.")
         
         history = [{"role": "user", "content": "hi"}, {"role": "assistant", "content": "hello"}]
         answer = self.rag.query_general("my name is mazen", history=history, language="English")
         
         self.assertEqual(answer, "Hello Mazen! I'm here to support you.")
-        self.rag.client.chat.completions.create.assert_called_once()
+        self.rag.general_module.assert_called_once()
 
     def test_query_condensation_with_history(self):
         """Verify that when history is provided, query condenses the follow-up query using LLM."""
@@ -126,27 +122,17 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
         self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
 
-        # Mock Groq LLM API responses: first for query condensation, second for final generation
-        mock_condense_choice = MagicMock()
-        mock_condense_choice.message.content = "Standalone condensed query"
-        
-        mock_gen_choice = MagicMock()
-        mock_gen_choice.message.content = "Grounded response content"
-        
-        mock_completions = MagicMock()
-        mock_completions.choices = [mock_condense_choice]
-        
-        mock_completions_gen = MagicMock()
-        mock_completions_gen.choices = [mock_gen_choice]
-        
-        # Side effect to return condensation first, then generation
-        self.rag.client.chat.completions.create.side_effect = [mock_completions, mock_completions_gen]
+        # Mock DSPy module calls
+        self.rag.retrieval_router = MagicMock(return_value="requires_retrieval")
+        self.rag.condense_module = MagicMock(return_value="Standalone condensed query")
+        self.rag.grounded_module = MagicMock(return_value="Grounded response content")
 
         history = [{"role": "user", "content": "I am sad because my friends hate me."}]
         output = self.rag.query("why am i depressed", history=history)
 
         self.assertEqual(output["answer"], "Grounded response content")
-        self.assertEqual(self.rag.client.chat.completions.create.call_count, 2)
+        self.rag.condense_module.assert_called_once()
+        self.rag.grounded_module.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

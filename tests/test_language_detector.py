@@ -3,8 +3,8 @@ from src.modules.language_detector import LanguageDetector, detect_language, pre
 
 def test_preprocess():
     """Verify that preprocessing cleans text, normalises unicode and collapses spaces correctly."""
-    assert preprocess("HELLO WORLD 123!!!") == "hello world 123!!!"
-    assert preprocess("Visit https://google.com for info") == "visit https://google.com for info"
+    assert preprocess("HELLO WORLD 123!!!") == "hello world"
+    assert preprocess("Visit https://google.com for info") == "visit for info"
     assert preprocess("Multiple   spaces    here") == "multiple spaces here"
 
 def test_detector_basic_en():

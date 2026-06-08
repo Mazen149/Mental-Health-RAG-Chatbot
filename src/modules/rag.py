@@ -11,6 +11,7 @@ import json
 import os
 from pathlib import Path
 import pickle
+import re
 from typing import List
 
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 import pandas as pd
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance
@@ -59,6 +61,14 @@ CRISIS_KEYWORDS = [
     "أنهي حياتي", "أقتل نفسي", "إيذاء نفسي", "خودکشی", "suicider", 
     "me tuer", "fin à mes jours", "suicidio", "quitarme la vida", "hacerme daño"
 ]
+
+
+def normalize_text(text: str) -> str:
+    """Normalize text: replace newlines/tabs with a space, collapse multiple spaces, lowercase."""
+    text = str(text)
+    text = re.sub(r'[\r\n\t]+', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip().lower()
 
 
 def detect_crisis(query: str) -> bool:
@@ -131,52 +141,112 @@ class MentalHealthRAG:
         self.collection_name = "mental_health"
 
         self.client = Groq(api_key=os.getenv("GROQ_API_KEY"))
-        self.embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        self.embeddings = HuggingFaceEmbeddings(model_name="BAAI/bge-small-en-v1.5")
         self.rerank_client = InferenceClient(
             provider="hf-inference",
             api_key=os.getenv("HF_TOKEN"),
+            timeout=2.0,
         )
         # For testing compatibility:
         if "Mock" in type(CrossEncoder).__name__ or "MagicMock" in type(CrossEncoder).__name__:
-            self.rerank_model = CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+            self.rerank_model = CrossEncoder('BAAI/bge-reranker-v2-m3')
         else:
             self.rerank_model = None
 
         self.vectorstore = None
         self.ensemble_retriever = None
         self.qdrant_client = None
+        
+        # Generation model and chunk settings
+        self.model_name = os.getenv("GROQ_GENERATION_MODEL", "openai/gpt-oss-20b")
+        self.chunk_size = 500
+        self.chunk_overlap = 100
 
     def load_and_preprocess(
         self,
         dataset_url: str = "hf://datasets/Amod/mental_health_counseling_conversations/combined_dataset.json",
     ) -> List[Document]:
-        """Loads dataset, consolidates counselors responses, truncates response length, and caches output."""
+        """Loads dataset, consolidates counselors responses, chunks responses, and caches output."""
+        current_settings = {
+            "dataset_url": dataset_url,
+            "chunk_size": self.chunk_size,
+            "chunk_overlap": self.chunk_overlap,
+        }
+
         # Check local cache first
         if os.path.exists(self.cache_path):
-            print(f"--> [RAG Setup] Loading preprocessed documents from cache: {self.cache_path}")
-            with open(self.cache_path, "rb") as f:
-                return pickle.load(f)
+            try:
+                with open(self.cache_path, "rb") as f:
+                    cache_data = pickle.load(f)
+                
+                # Verify settings metadata
+                if isinstance(cache_data, dict) and "metadata" in cache_data and "documents" in cache_data:
+                    cached_metadata = cache_data["metadata"]
+                    if (cached_metadata.get("dataset_url") == dataset_url and
+                        cached_metadata.get("chunk_size") == self.chunk_size and
+                        cached_metadata.get("chunk_overlap") == self.chunk_overlap):
+                        print(f"--> [RAG Setup] Loading preprocessed documents from cache: {self.cache_path}")
+                        return cache_data["documents"]
+                    else:
+                        print("--> [RAG Setup] Cache settings mismatch. Regenerating cache...")
+                else:
+                    print("--> [RAG Setup] Legacy cache found. Regenerating cache...")
+            except Exception as e:
+                print(f"--> [RAG Setup] Error loading cache: {e}. Regenerating...")
 
         print("--> [RAG Setup] Preprocessed cache not found. Downloading and preprocessing dataset...")
         df = pd.read_json(dataset_url, lines=True)
-        df.drop_duplicates(inplace=True)
-        df_processed = df.groupby('Context').agg({'Response': ' '.join}).reset_index()
-        df_processed.drop(index=0, inplace=True)
 
-        MAX_LENGTH = 605
-        df_processed['Response'] = df_processed['Response'].apply(
-            lambda x: " ".join(x.split()[:MAX_LENGTH]) if len(x.split()) > MAX_LENGTH else x
+        # Step 1: Normalize + dedup + group (Approach 3)
+        df["Context_norm"] = df["Context"].apply(normalize_text)
+        df["Response_norm"] = df["Response"].apply(normalize_text)
+        df_dedup = df.drop_duplicates(subset=["Context_norm", "Response_norm"]).copy()
+
+        df_grouped = (
+            df_dedup.groupby("Context_norm", as_index=False)
+            .agg({"Context": "first", "Response": " ".join})
+        )
+        df_grouped.drop(index=0, errors="ignore", inplace=True)
+        df_grouped.reset_index(drop=True, inplace=True)
+
+        # Truncate to 750 words
+        df_grouped["Response"] = df_grouped["Response"].apply(
+            lambda x: " ".join(x.split()[:750])
         )
 
-        documents = [
-            Document(page_content=row['Context'], metadata={"response": row['Response']})
-            for _, row in df_processed.iterrows()
-        ]
+        # Step 2: Chunk each response
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=self.chunk_size,
+            chunk_overlap=self.chunk_overlap,
+            separators=["\n\n", "\n", ". ", " ", ""],
+        )
+
+        documents = []
+        for _, row in df_grouped.iterrows():
+            question = row["Context"]
+            full_response = row["Response"]
+            chunks = text_splitter.split_text(full_response)
+
+            if not chunks:
+                # Response too short to chunk — use as-is
+                documents.append(Document(
+                    page_content=f"{question}\n\n{full_response}",
+                    metadata={"question": question, "response": full_response},
+                ))
+            else:
+                for chunk in chunks:
+                    documents.append(Document(
+                        page_content=f"{question}\n\n{chunk}",
+                        metadata={"question": question, "response": full_response},
+                    ))
 
         # Save to cache
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
         with open(self.cache_path, "wb") as f:
-            pickle.dump(documents, f)
+            pickle.dump({
+                "metadata": current_settings,
+                "documents": documents
+            }, f)
 
         return documents
 
@@ -237,8 +307,8 @@ class MentalHealthRAG:
 
         print("--> [RAG Setup] Initializing hybrid ensemble retriever...")
         bm25_retriever = BM25Retriever.from_documents(documents)
-        bm25_retriever.k = 10
-        qdrant_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 10})
+        bm25_retriever.k = 5
+        qdrant_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
 
         self.ensemble_retriever = EnsembleRetriever(
             retrievers=[bm25_retriever, qdrant_retriever],
@@ -290,11 +360,56 @@ class MentalHealthRAG:
 
         return docs_with_scores
 
-    def query(self, user_query: str, system_prompt: str | None = None, translated_query: str | None = None) -> dict:
+    def query(
+        self, 
+        user_query: str, 
+        system_prompt: str | None = None, 
+        translated_query: str | None = None,
+        history: list | None = None
+    ) -> dict:
         if not self.ensemble_retriever:
             return {"answer": "Retriever not set up.", "resources": []}
 
         retrieval_query = translated_query if translated_query is not None else user_query
+
+        # Condense query if history exists to make document retrieval history-aware
+        if history and len(history) > 0:
+            condense_prompt = (
+                "Given a chat history and the latest user question which might reference context in the chat history, "
+                "formulate a standalone question which can be understood without the chat history. "
+                "The standalone question MUST be written in English. Do NOT answer the question, just reformulate it "
+                "and output ONLY the standalone question."
+            )
+            condense_messages = [{"role": "system", "content": condense_prompt}]
+            
+            # Keep only the last 6 messages of history for context
+            pruned_history = history[-6:]
+            for msg in pruned_history:
+                if hasattr(msg, "role") and hasattr(msg, "content"):
+                    role = msg.role
+                    content = msg.content
+                elif isinstance(msg, dict):
+                    role = msg.get("role")
+                    content = msg.get("content")
+                else:
+                    continue
+                if role in ("user", "assistant"):
+                    condense_messages.append({"role": role, "content": content})
+            
+            condense_messages.append({"role": "user", "content": retrieval_query})
+            
+            try:
+                condense_completion = self.client.chat.completions.create(
+                    messages=condense_messages,
+                    model=self.model_name,
+                    temperature=0.0
+                )
+                condensed = condense_completion.choices[0].message.content.strip()
+                if condensed:
+                    retrieval_query = condensed
+            except Exception as e:
+                print(f"Error during query condensation: {e}")
+
         reranked_docs = self.retrieve(retrieval_query)
         if not reranked_docs:
             return {"answer": "No relevant context found.", "resources": []}
@@ -311,12 +426,31 @@ class MentalHealthRAG:
         top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:3])])
         sys_prompt = system_prompt or "You are a compassionate mental health assistant. Combine context into a supportive answer."
 
+        formatted_messages = [{"role": "system", "content": sys_prompt}]
+
+        if history:
+            # Keep only the last 6 messages of history for a small, optimized context window
+            pruned_history = history[-6:]
+            for msg in pruned_history:
+                if hasattr(msg, "role") and hasattr(msg, "content"):
+                    role = msg.role
+                    content = msg.content
+                elif isinstance(msg, dict):
+                    role = msg.get("role")
+                    content = msg.get("content")
+                else:
+                    continue
+                if role in ("user", "assistant"):
+                    formatted_messages.append({"role": role, "content": content})
+
+        formatted_messages.append({
+            "role": "user",
+            "content": f"Query: {user_query}\n\nContext:\n{top_context}"
+        })
+
         chat_completion = self.client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": sys_prompt},
-                {"role": "user", "content": f"Query: {user_query}\n\nContext:\n{top_context}"}
-            ],
-            model="openai/gpt-oss-20b",
+            messages=formatted_messages,
+            model=self.model_name,
             temperature=0.7
         )
 
@@ -324,6 +458,50 @@ class MentalHealthRAG:
             "answer": chat_completion.choices[0].message.content,
             "resources": resources
         }
+
+    def query_general(
+        self,
+        user_query: str,
+        history: list | None = None,
+        language: str = "English"
+    ) -> str:
+        # Build system prompt for general conversation in user's language/context
+        sys_prompt = (
+            f"You are Serene AI, a compassionate, friendly, and professional mental health support assistant.\n"
+            f"The user's language is {language}.\n"
+            f"The user is engaging in greeting, goodbye, gratitude, or basic small talk/introductions (like sharing or asking about names).\n"
+            f"Respond warmly, naturally, and in a friendly conversational manner in their language ({language}).\n"
+            f"If the user has introduced themselves or mentioned their name in the history or current query, acknowledge and remember it. "
+            f"If they ask for their name, tell them their name if it was mentioned.\n"
+            f"Keep your response concise, to exactly 1-3 sentences. Do not offer clinical advice here; just be warm, welcoming, and supportive."
+        )
+
+        formatted_messages = [{"role": "system", "content": sys_prompt}]
+
+        if history:
+            # Keep only the last 6 messages
+            pruned_history = history[-6:]
+            for msg in pruned_history:
+                if hasattr(msg, "role") and hasattr(msg, "content"):
+                    role = msg.role
+                    content = msg.content
+                elif isinstance(msg, dict):
+                    role = msg.get("role")
+                    content = msg.get("content")
+                else:
+                    continue
+                if role in ("user", "assistant"):
+                    formatted_messages.append({"role": role, "content": content})
+
+        formatted_messages.append({"role": "user", "content": user_query})
+
+        chat_completion = self.client.chat.completions.create(
+            messages=formatted_messages,
+            model=self.model_name,
+            temperature=0.7
+        )
+
+        return chat_completion.choices[0].message.content
 
     def close(self) -> None:
         if hasattr(self, "qdrant_client") and self.qdrant_client is not None:

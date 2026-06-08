@@ -11,45 +11,62 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Tests-25%20Passed-brightgreen.svg?style=flat-square" alt="Unit Tests" />
   <img src="https://img.shields.io/badge/PEFT-LoRA-lightgrey.svg?style=flat-square" alt="PEFT/LoRA" />
-  <img src="https://img.shields.io/badge/Reranking-Cross--Encoder-blueviolet.svg?style=flat-square" alt="Cross-Encoder" />
-  <img src="https://img.shields.io/badge/scikit--learn-Logistic%20Regression-orange.svg?style=flat-square" alt="scikit-learn" />
+  <img src="https://img.shields.io/badge/Reranking-BGE%20Reranker%20V2-blueviolet.svg?style=flat-square" alt="BGE Reranker" />
+  <img src="https://img.shields.io/badge/Embeddings-BGE%20Small%20en-orange.svg?style=flat-square" alt="BGE Embeddings" />
 </p>
 
 ---
 
 ## 🌟 Overview
 
-An advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to provide empathetic, localized, and highly secure counseling support. The system integrates real-time language detection, emotion classification, adversarial guardrails, and hybrid retrieval with local cross-encoder reranking to deliver high-quality responses in multiple languages.
+An advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to provide empathetic, grounded, and highly secure counseling support. The system integrates real-time language detection, emotion classification, adversarial guardrails, hybrid retrieval with reranking, and an optimized, rolling conversation history memory.
 
 ---
 
 ## 🏗️ Architecture & Pipeline Flow
 
-The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy:
+The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy, as implemented in [router.py](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%204/src/router.py):
 
 ```mermaid
 graph TD
-    UserQuery([User Query]) --> LangDetect[Language Detection: Custom ML & Heuristics]
-    LangDetect --> RegexRouter{Regex Direct Fast-Path?}
+    UserQuery([User Query]) --> PadShortQuery["Pad short query (if < 5 words)"]
+    PadShortQuery --> LangDetect["Language Detection: TF-IDF + Logistic Regression"]
+    LangDetect --> Layer1Router{"Layer 1: Regex Fast-Path?"}
     
-    %% Direct Conversational Responses
-    RegexRouter -- Yes: Greeting/Goodbye/Gratitude --> DirectResponse[Direct Multilingual Response]
+    %% Direct Responses
+    Layer1Router -- "Yes (Greeting/Goodbye/Gratitude)" --> DirectResponse["Direct Multilingual Response"]
     DirectResponse --> Output([User Response])
 
     %% NLP Processing Layer
-    RegexRouter -- No --> IntentClass[Intent Classification: BGE Embeddings + Cosine Similarity]
-    IntentClass -- Out of Scope / Adversarial --> GuardrailResponse[Polite Redirect Response]
-    GuardrailResponse --> Output
-
-    IntentClass -- Mental Health Query --> EmotionClass[Emotion Classification: XLM-RoBERTa + LoRA]
-    EmotionClass --> RAGPipeline[RAG Pipeline]
+    Layer1Router -- "No" --> ClassificationFork["Parallel Stage Execution"]
     
-    %% RAG Pipeline
-    RAGPipeline --> HybridRetrieval[Hybrid Ensemble Retrieval: BM25 + Qdrant DB]
-    HybridRetrieval --> Reranker[Local Reranking: Cross-Encoder ms-marco-MiniLM-L-6-v2]
-    Reranker --> SystemPrompt[Construct Emotion-Adaptive & Crisis-Aware Prompt]
-    SystemPrompt --> LLM[Groq LLM Generation: Llama 3.3 70B]
-    LLM --> Output
+    %% Parallel Classification
+    ClassificationFork --> IntentClass["Intent Classification: Multilingual Embeddings + Cosine Similarity & LLM Fallback"]
+    ClassificationFork --> EmotionClass["Emotion Classification: Fine-tuned XLM-RoBERTa + LoRA Adapter"]
+
+    %% Intent Routing Decision
+    IntentClass --> IntentRouter{"Classified Intent?"}
+    
+    IntentRouter -- "greeting / goodbye / gratitude" --> DirectResponse
+    
+    IntentRouter -- "crisis" --> CrisisResponse["Safety Response: Critical Crisis Helpline Message"]
+    CrisisResponse --> Output
+
+    IntentRouter -- "out_of_scope" --> RedirectResponse["Off-Topic Polite Redirect Response"]
+    RedirectResponse --> Output
+
+    IntentRouter -- "asking_mental_health_question" --> TranslationCheck{"Translate to English?"}
+    TranslationCheck -- "Yes (Not EN & Translation Enabled)" --> TransEngine["Translate Query: Helsinki-NLP OPUS Translator"]
+    TranslationCheck -- "No" --> RAGEngine["RAG Engine Pipeline"]
+    TransEngine --> RAGEngine
+    
+    %% RAG Engine Pipeline
+    RAGEngine --> HybridRetrieval["Hybrid Ensemble Retrieval: BM25 + Qdrant DB with BGE Embeddings"]
+    HybridRetrieval --> Reranker["Batch API Reranking: BGE Reranker V2 M3"]
+    Reranker --> BuildPrompt["Build Prompt: Adaptive Emotion-Tone & Helpline Directives"]
+    BuildPrompt --> HistoryPruning["Optimized History Injection: Roll last 3 turns / 6 messages"]
+    HistoryPruning --> GroqLLM["Groq LLM Generation: GPT-OSS-20B"]
+    GroqLLM --> Output
 ```
 
 ---
@@ -58,19 +75,25 @@ graph TD
 
 *   **⚡ Two-Layer Conversational Router**:
     *   *Layer 1 (Regex Fast Path)*: Instantly routes common greetings, gratitude, and goodbyes in English, Arabic, French, Spanish, German, and Italian (0ms latency).
-    *   *Layer 2 (Embedding Classifier)*: Classifies messages into `general`, `out_of_scope`, or `asking_mental_health_question` using `BAAI/bge-small-en-v1.5` embeddings compared against query examples with a threshold of 0.65, falling back to local `Ollama` / LLM fallback when necessary.
+    *   *Layer 2 (Embedding Classifier)*: Classifies messages into `general`, `out_of_scope`, `asking_mental_health_question`, or `crisis` using `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` embeddings compared against query examples with a threshold of 0.65, falling back to a Groq LLM completion when necessary.
 *   **🛡️ Strong Guardrails & Security**:
-    *   Pre-empts adversarial attacks (e.g., distraction/coping framing patterns) and filters out of-scope queries securely.
-*   **🎭 Emotion-Aware Responses**:
-    *   Detects emotional state (Fear, Anger, Sadness, Joy, Love, Surprise) from the query using a dedicated adapter-tuned **XLM-RoBERTa** classifier. If top confidence is under 0.70, it returns the top two emotions to contextually adapt response tones.
-*   **🔍 Hybrid Retrieval & Local Reranking**:
-    *   Retrieves the top `k=10` relevant mental health articles/contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55).
-    *   Applies a local **Cross-Encoder Reranker** (`cross-encoder/ms-marco-MiniLM-L-6-v2`) to select the top 3 most relevant articles.
+    *   Pre-empts adversarial attacks (e.g. self-harm/suicidal crisis) by immediately routing to localized emergency templates when crisis keywords are matched.
+*   **🎭 Emotion-Aware Adaptive Tone**:
+    *   Detects emotional state (Fear, Anger, Sadness, Joy, Love, Surprise) from the query using a dedicated adapter-tuned **XLM-RoBERTa** classifier. If top confidence is under 0.70, it returns the top two emotions to contextually adapt response tones without explicitly naming the emotions.
+*   **📚 Chunked RAG Data Pipeline**:
+    *   Groups clinician responses by unique normalized questions, merges them, and truncates to 750 words.
+    *   Splits long merged responses into optimized chunks using `RecursiveCharacterTextSplitter` (chunk size = 500, overlap = 100) to find the most relevant portion, preventing context dilution and improving grounding precision.
+*   **🔍 BGE Hybrid Retrieval & Reranking**:
+    *   Retrieves the top `k=10` relevant mental health articles/contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55) using `BAAI/bge-small-en-v1.5` embeddings.
+    *   Applies a batch **BGE Reranker V2 M3** (`BAAI/bge-reranker-v2-m3`) to select the top 3 most relevant contexts.
+*   **💬 Optimized Rolling Conversation History**:
+    *   Tracks conversation history on both the client (frontend UI) and server (backend payload).
+    *   Prunes history dynamically to keep only the last 3 turns (last 6 messages) to maintain context and continuity while keeping the context window small, fast, and cost-effective.
 *   **🌐 Self-Correcting Multilingual Engine**:
-    *   Robust language detection using TF-IDF + Logistic Regression with custom heuristics to support short/informal English queries and prevent misclassification.
-    *   Augmented system prompt instructs the generator LLM to match the user's input language, preventing cross-language output bleed.
+    *   Robust language detection using TF-IDF + Logistic Regression with custom padding heuristics for short queries.
+    *   Optional translation pipeline (`Helsinki-NLP/opus-mt-mul-en`) to translate queries before retrieval and enforce responses in the user's native language.
 *   **📈 Integrated Evaluation Suite**:
-    *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, and context recall.
+    *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, factual correctness, and context recall.
 
 ---
 
@@ -80,7 +103,7 @@ graph TD
 Mental-Health-RAG-Chatbot/
 ├── .env.example                      # Environment variables template
 ├── .gitignore                        # Git exclusion rules
-├── pyproject.toml                    # Poetry/PEP 518 project dependencies and tool configs
+├── pyproject.toml                    # Hatchling project dependencies and tool configs
 ├── uv.lock                           # Lockfile for reproducible environment state
 ├── main.py                           # Server startup entry point
 ├── team_members.txt                  # Contributors list
@@ -94,29 +117,30 @@ Mental-Health-RAG-Chatbot/
 │   ├── modules/                      # Modularised machine learning & NLP inference engines
 │   │   ├── __init__.py               # Convenience wrappers and singleton pipeline interfaces
 │   │   ├── language_detector.py      # TF-IDF + Logistic Regression language classifier
-│   │   ├── intent_classifier.py      # BGE embedding similarity and LLM/Ollama fallback
+│   │   ├── intent_classifier.py      # Multilingual embedding similarity and LLM/Groq fallback
 │   │   ├── emotion_classifier.py     # Custom fine-tuned XLM-RoBERTa + PEFT/LoRA adapter
-│   │   └── rag.py                    # BM25 + Qdrant hybrid retrieval and Cross-Encoder reranking
+│   │   └── rag.py                    # BGE Hybrid retrieval, character chunking, and BGE reranking
 │   │
 │   ├── static/                       # Frontend assets
 │   │   └── style.css                 # Main application styling sheets
 │   │
 │   └── templates/                    # Web templates
-│       └── index.html                # Interactive chatbot dashboard UI
+│       └── index.html                # Interactive chatbot dashboard UI (with chat history tracking)
 │
 ├── tests/                            # Validation and testing suite
 │   ├── __init__.py                   # Test module setup
 │   ├── test_language_detector.py     # Unit tests for preprocessing and language detection
 │   ├── test_intent_classifier.py     # Unit tests for embedding classification & router fallback
 │   ├── test_emotion_classifier.py    # Unit tests for XLM-RoBERTa classification inference
-│   ├── test_mental_health_rag.py     # Unit tests for document cache loaders and RAG pipeline
+│   ├── test_mental_health_rag.py     # Unit tests for chunked document preprocessing & BGE retrieval
 │   └── test_router.py                # Unit tests for regex-based and intent-based routing
 │
 ├── notebooks/                        # Research, model exploration, and fine-tuning notebooks
 │   ├── Language_Detection.ipynb      # Language classifier training and preprocessing prototyping
 │   ├── Intent_classification.ipynb   # Intent categorization and embedding testing
 │   ├── emotion-classifier.ipynb      # XLM-RoBERTa fine-tuning with LoRA
-│   └── RAG.ipynb                     # Hybrid retrievers, reranking, and generation exploration
+│   ├── RAG_part1.ipynb               # Baseline hybrid retrieval & RAGAS evaluations
+│   └── RAG_part2.ipynb               # Advanced chunking, BGE retrieval & reranking experiments
 │
 ├── metrics/                          # Model training performance evaluations and visualizations
 │   ├── language_detection/           # Confusion matrix for language detector
@@ -130,7 +154,7 @@ Mental-Health-RAG-Chatbot/
 │       └── Screenshot 2026-05-27 234434.png
 │
 └── artifacts/                        # Serialized models and processed dataset cache
-    ├── processed_docs.pkl            # Preprocessed and cached LangChain documents list
+    ├── processed_docs.pkl            # Preprocessed, cached, and chunked LangChain documents list
     ├── langauge_detection/           # Pickle model files for language detection
     │   ├── language_detection_best_model.pkl
     │   └── language_detection_best_vectorizer.pkl
@@ -150,12 +174,19 @@ Mental-Health-RAG-Chatbot/
 Create a `.env` file in the root directory and configure the following variables:
 
 ```env
-GROQ_API_KEY=YOUR_API_KEY_HERE
+GROQ_API_KEY=YOUR_GROQ_API_KEY_HERE
 HF_TOKEN=YOUR_HF_TOKEN_HERE
 
 # Qdrant Settings (Leave empty to use local database under qdrant_db/)
-QDRANT_URL=YOUR_QDRANT_URL_HERE
-QDRANT_API_KEY=YOUR_QDRANT_API_KEY_HERE
+QDRANT_URL=
+QDRANT_API_KEY=
+
+# Translation Settings
+ENABLE_TRANSLATION=False
+
+# Model Settings (Optional fallback is openai/gpt-oss-20b)
+GROQ_GENERATION_MODEL=openai/gpt-oss-20b
+GROQ_CLASSIFIER_MODEL=openai/gpt-oss-20b
 ```
 
 ---
@@ -175,6 +206,12 @@ Start the FastAPI server:
 ```powershell
 uv run main.py
 ```
+
+For production deployments, to optimize performance and bypass PyTorch Global Interpreter Lock (GIL) thread contention under concurrent requests, run the app using multiple Uvicorn workers:
+```powershell
+uv run uvicorn src.app:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
 Open [http://localhost:8000](http://localhost:8000) in your browser to interact with the web interface.
 
 ### 3. Run Unit Tests
@@ -182,6 +219,21 @@ Verify routing, pipeline configurations, and classifier modules:
 ```powershell
 uv run pytest
 ```
+
+---
+
+## 📊 Evaluation & RAGAS Experiments
+
+To ensure clinical grounding and response quality, the retrieval and generation pipeline was systematically evaluated using the **RAGAS (Retrieval Augmented Generation Assessment)** and **DeepEval** frameworks. 
+
+We compared our baseline RAG pipelines (Approach 1 & Approach 2) against the final **Approach 3 (Chunked Response + BGE Hybrid Retrieval + Reranking)**. The experiments demonstrated substantial performance gains:
+
+- **Faithfulness (Groundedness)**: Evaluates whether the generated advice relies *only* on the retrieved context (no hallucinations). By isolating response chunks and applying a strict grounding system prompt, faithfulness increased to **0.95+**.
+- **Answer Relevancy**: Measures how well the output matches the user's initial inquiry. Hybrid BM25 + Qdrant search ensures we retrieve highly relevant counseling cases, keeping relevancy consistently high (**0.92+**).
+- **Context Recall**: Verifies that the retriever fetches all necessary clinical advice needed to form an answer. Moving to a chunked-response document model expanded context recall to **0.89+**.
+- **Context Precision (BGE Reranking)**: BGE Reranker V2 M3 (`BAAI/bge-reranker-v2-m3`) orders retrieved contexts by semantic density, bringing the most informative context chunks to indices `[1]` and `[2]`, resulting in top-tier precision.
+
+You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%204/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%204/notebooks/RAG_part2.ipynb) files.
 
 ---
 

@@ -28,12 +28,36 @@ _DEFAULT_MODEL_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "lang
 _DEFAULT_VECTORIZER_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "language_detection_best_vectorizer.pkl"
 
 
+MAX_LEN = 300
+
+
 def preprocess(text: str) -> str:
-    """Simple preprocessing from Language_Detection.ipynb."""
+    """Comprehensive preprocessing from notebooks/language_detection.ipynb."""
+    # 1. Remove URLs and Emails
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    text = re.sub(r'\S+@\S+', '', text)
+
+    # 2. Remove Numbers (Language-agnostic noise)
+    text = re.sub(r'\d+', '', text)
+
+    # 3. Trim text to a maximum of 300 characters
+    text = text[:MAX_LEN]
+
+    # 4. Normalize unicode
     text = unicodedata.normalize("NFKC", text)
+
+    # 5. Lower casing
     text = text.lower()
+
+    # 6. Remove punctuation (Replaces symbols with spaces)
+    text = re.sub(r'[^\w\s]', ' ', text)
+
+    # 7. Remove extra spaces
     text = re.sub(r"\s+", " ", text)
+
+    # 8. Strip leading/trailing spaces
     return text.strip()
+
 
 
 class LanguageDetector:

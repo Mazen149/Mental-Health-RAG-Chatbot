@@ -21,6 +21,22 @@ def mock_hf_inference():
         mock_client_class.return_value = mock_client_inst
         yield mock_client_inst
 
+@pytest.fixture(autouse=True)
+def mock_sentence_transformer():
+    """Autouse fixture to mock SentenceTransformer during test execution."""
+    with patch("sentence_transformers.SentenceTransformer") as mock_transformer_class:
+        mock_transformer_inst = MagicMock()
+        
+        # Mock encode to return dummy vectors of length 384
+        def mock_encode(texts, **kwargs):
+            if isinstance(texts, str):
+                return np.asarray([0.05] * 384, dtype=np.float32)
+            return np.asarray([[0.05] * 384 for _ in texts], dtype=np.float32)
+            
+        mock_transformer_inst.encode.side_effect = mock_encode
+        mock_transformer_class.return_value = mock_transformer_inst
+        yield mock_transformer_inst
+
 def test_intent_classifier_embedding_match():
     """Verify that classifier returns Intent object on successful embedding lookup."""
     classifier = IntentClassifier()
@@ -59,7 +75,7 @@ def test_intent_classifier_default_fallback():
     
     with patch.object(classifier, "_embedding_classifier", return_value=None):
         res = classifier.classify("What is Python?")
-        assert res.type == "general"
+        assert res.type == "greeting"
         assert res.confidence == 0.5
         assert res.classifier == "llm"
 
@@ -68,10 +84,10 @@ def test_intent_router():
     router = IntentRouter()
     
     with patch.object(router.classifier, "classify") as mock_classify:
-        # 1. General intent routing
-        mock_classify.return_value = Intent(type="general", confidence=0.9, classifier="embedding")
+        # 1. Greeting intent routing
+        mock_classify.return_value = Intent(type="greeting", confidence=0.9, classifier="embedding")
         res = router.route("Hello!", detected_language="en")
-        assert res["intent"] == "general"
+        assert res["intent"] == "greeting"
         assert res["action"] == "direct_reply"
         assert res["use_rag"] is False
         assert "support you" in res["response"]
@@ -97,6 +113,6 @@ def test_convenience_function():
     from src.modules.intent_classifier import classify_intent
     
     with patch("src.modules.intent_classifier._classifier_instance") as mock_inst:
-        mock_inst.classify.return_value = Intent(type="general", confidence=0.9, classifier="embedding")
+        mock_inst.classify.return_value = Intent(type="greeting", confidence=0.9, classifier="embedding")
         res = classify_intent("hi")
-        assert res.type == "general"
+        assert res.type == "greeting"

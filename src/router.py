@@ -39,6 +39,7 @@ ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in ("true"
 from .modules import detect_language, classify_emotion, classify_intent
 from .modules.multilingual_patterns import (
     GREETING_REGEX, GOODBYE_REGEX, GRATITUDE_REGEX,
+    GREETING_REGEX_BY_LANG, GOODBYE_REGEX_BY_LANG, GRATITUDE_REGEX_BY_LANG,
     GREETING_RESPONSES, GOODBYE_RESPONSES, GRATITUDE_RESPONSES,
     CRITICAL_CRISIS_RESPONSES, OUT_OF_SCOPE_RESPONSES
 )
@@ -103,7 +104,7 @@ def get_direct_gratitude(language: str) -> str:
     """Returns a direct warm gratitude acknowledgement in the user's language."""
     return GRATITUDE_RESPONSES.get(language, GRATITUDE_RESPONSES["English"])
 
-async def route_query(query: str, rag_instance) -> dict:
+async def route_query(query: str, rag_instance, history: list = None) -> dict:
     """
     Routes the user query dynamically in an asynchronous manner.
     
@@ -136,6 +137,20 @@ async def route_query(query: str, rag_instance) -> dict:
     
     if GREETING_REGEX.match(cleaned) and len(cleaned.split()) <= 2:
         safe_print("--> [Router] Matched greeting intent via Layer 1 regex.")
+        # Exact language matching to bypass unreliable ML classification on short query text
+        matched_language = None
+        if language in GREETING_REGEX_BY_LANG and GREETING_REGEX_BY_LANG[language].match(cleaned):
+            matched_language = language
+        elif GREETING_REGEX_BY_LANG["English"].match(cleaned):
+            matched_language = "English"
+        else:
+            for lang, r_pattern in GREETING_REGEX_BY_LANG.items():
+                if r_pattern.match(cleaned):
+                    matched_language = lang
+                    break
+        if matched_language:
+            language = matched_language
+            safe_print(f"--> [Router] Override language to {language} based on greeting pattern match.")
         return {
             "answer": get_direct_greeting(language),
             "resources": [],
@@ -146,6 +161,19 @@ async def route_query(query: str, rag_instance) -> dict:
     
     if GOODBYE_REGEX.match(cleaned) and len(cleaned.split()) <= 3:
         safe_print("--> [Router] Matched goodbye intent via Layer 1 regex.")
+        matched_language = None
+        if language in GOODBYE_REGEX_BY_LANG and GOODBYE_REGEX_BY_LANG[language].match(cleaned):
+            matched_language = language
+        elif GOODBYE_REGEX_BY_LANG["English"].match(cleaned):
+            matched_language = "English"
+        else:
+            for lang, r_pattern in GOODBYE_REGEX_BY_LANG.items():
+                if r_pattern.match(cleaned):
+                    matched_language = lang
+                    break
+        if matched_language:
+            language = matched_language
+            safe_print(f"--> [Router] Override language to {language} based on goodbye pattern match.")
         return {
             "answer": get_direct_goodbye(language),
             "resources": [],
@@ -156,6 +184,19 @@ async def route_query(query: str, rag_instance) -> dict:
     
     if GRATITUDE_REGEX.match(cleaned) and len(cleaned.split()) <= 3:
         safe_print("--> [Router] Matched gratitude intent via Layer 1 regex.")
+        matched_language = None
+        if language in GRATITUDE_REGEX_BY_LANG and GRATITUDE_REGEX_BY_LANG[language].match(cleaned):
+            matched_language = language
+        elif GRATITUDE_REGEX_BY_LANG["English"].match(cleaned):
+            matched_language = "English"
+        else:
+            for lang, r_pattern in GRATITUDE_REGEX_BY_LANG.items():
+                if r_pattern.match(cleaned):
+                    matched_language = lang
+                    break
+        if matched_language:
+            language = matched_language
+            safe_print(f"--> [Router] Override language to {language} based on gratitude pattern match.")
         return {
             "answer": get_direct_gratitude(language),
             "resources": [],
@@ -213,7 +254,8 @@ async def route_query(query: str, rag_instance) -> dict:
             rag_instance.query, 
             user_query=query, 
             system_prompt=system_prompt, 
-            translated_query=query_en
+            translated_query=query_en,
+            history=history
         )
         return {
             "answer": result["answer"],
@@ -224,15 +266,15 @@ async def route_query(query: str, rag_instance) -> dict:
         }
         
     elif intent in ["greeting", "goodbye", "gratitude"]:
-        # Conversational intent caught by LLM (not regex) -> Use template responses
-        safe_print(f"--> [Router] Routing to conversational template ({intent}) via Layer 2 fallback.")
+        # Conversational intent caught by LLM (not regex) -> Generate warm dynamic response using LLM with history
+        safe_print(f"--> [Router] Routing to conversational LLM ({intent}) via Layer 2 fallback.")
         
-        if intent == "greeting":
-            answer = get_direct_greeting(language)
-        elif intent == "goodbye":
-            answer = get_direct_goodbye(language)
-        else:  # gratitude
-            answer = get_direct_gratitude(language)
+        answer = await asyncio.to_thread(
+            rag_instance.query_general,
+            user_query=query,
+            history=history,
+            language=language
+        )
             
         return {
             "answer": answer,

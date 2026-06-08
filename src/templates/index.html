@@ -1,247 +1,288 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Serene AI - Empathetic Mental Health Support</title>
-    <!-- Premium Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/style.css" />
-  </head>
-  <body>
-    <div class="app-shell">
-      <!-- Top Decorative Blur Elements -->
-      <div class="blur-glow glow-1"></div>
-      <div class="blur-glow glow-2"></div>
 
-      <header class="hero-header">
-        <div class="header-icon-wrap">
-          <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-            <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
-            <line x1="12" y1="19" x2="12" y2="22"/>
-          </svg>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Serene AI - Empathetic Mental Health Support</title>
+  <!-- Premium Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+
+<body>
+  <div class="app-shell">
+    <!-- Top Decorative Blur Elements -->
+    <div class="blur-glow glow-1"></div>
+    <div class="blur-glow glow-2"></div>
+
+    <header class="hero-header">
+      <div class="header-icon-wrap">
+        <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+          <line x1="12" y1="19" x2="12" y2="22" />
+        </svg>
+      </div>
+      <h1>Serene AI</h1>
+      <p>A safe, compassionate space for mental health support, grounded in professional counseling resources.</p>
+    </header>
+
+    <main class="chat-container">
+      <!-- Chat Area Header -->
+      <div class="chat-header">
+        <div class="status-indicator">
+          <span class="status-dot pulsing"></span>
+          <span class="status-text">Active & Grounded</span>
         </div>
-        <h1>Serene AI</h1>
-        <p>A safe, compassionate space for mental health support, grounded in professional counseling resources.</p>
-      </header>
-
-      <main class="chat-container">
-        <!-- Chat Area Header -->
-        <div class="chat-header">
-          <div class="status-indicator">
-            <span class="status-dot pulsing"></span>
-            <span class="status-text">Active & Grounded</span>
-          </div>
+        <div class="chat-actions">
+          <button type="button" id="clear-btn" class="clear-btn" title="Clear Chat History">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Clear Chat
+          </button>
           <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
         </div>
+      </div>
 
-        <!-- Chat Window -->
-        <section class="chat-window" id="chat-window">
-          <div class="bubble assistant system-intro">
+      <!-- Chat Window -->
+      <section class="chat-window" id="chat-window">
+        <div class="bubble assistant system-intro">
+          <h3>Welcome to Serene AI</h3>
+          <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress,
+            relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.
+          </p>
+        </div>
+      </section>
+
+      <!-- Chat Input Form -->
+      <form id="chat-form" class="chat-form">
+        <div class="input-wrapper">
+          <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
+          <button type="submit" id="send-btn" title="Send Message">
+            <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </form>
+    </main>
+
+    <footer class="app-footer">
+      <p>⚠️ <strong>Crisis Notice:</strong> If you are in immediate danger, please reach out to local emergency services
+        or contact a national crisis hotline.</p>
+    </footer>
+  </div>
+
+  <!-- Formatting & Security Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js"
+    integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script>
+    const chatWindow = document.getElementById('chat-window');
+    const chatForm = document.getElementById('chat-form');
+    const queryInput = document.getElementById('query');
+    const sendBtn = document.getElementById('send-btn');
+    const clearBtn = document.getElementById('clear-btn');
+    const chatHistory = [];
+
+    // Clear Chat history
+    clearBtn.addEventListener('click', () => {
+      chatHistory.length = 0;
+      const welcomeMessage = chatWindow.querySelector('.system-intro');
+      chatWindow.innerHTML = '';
+      if (welcomeMessage) {
+        chatWindow.appendChild(welcomeMessage);
+      } else {
+        const intro = document.createElement('div');
+        intro.className = 'bubble assistant system-intro';
+        intro.innerHTML = `
             <h3>Welcome to Serene AI</h3>
             <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress, relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.</p>
-          </div>
-        </section>
+          `;
+        chatWindow.appendChild(intro);
+      }
+    });
 
-        <!-- Chat Input Form -->
-        <form id="chat-form" class="chat-form">
-          <div class="input-wrapper">
-            <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
-            <button type="submit" id="send-btn" title="Send Message">
-              <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          </div>
-        </form>
-      </main>
+    // Auto-grow textarea height
+    queryInput.addEventListener('input', function () {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+    });
 
-      <footer class="app-footer">
-        <p>⚠️ <strong>Crisis Notice:</strong> If you are in immediate danger, please reach out to local emergency services or contact a national crisis hotline.</p>
-      </footer>
-    </div>
+    // Enter key submits (Shift+Enter inserts new line)
+    queryInput.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        chatForm.requestSubmit();
+      }
+    });
 
-    <!-- Formatting & Security Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js" integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script>
-      const chatWindow = document.getElementById('chat-window');
-      const chatForm = document.getElementById('chat-form');
-      const queryInput = document.getElementById('query');
-      const sendBtn = document.getElementById('send-btn');
-
-      // Auto-grow textarea height
-      queryInput.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = (this.scrollHeight) + 'px';
-      });
-
-      // Enter key submits (Shift+Enter inserts new line)
-      queryInput.addEventListener('keydown', function(event) {
-        if (event.key === 'Enter' && !event.shiftKey) {
-          event.preventDefault();
-          chatForm.requestSubmit();
-        }
-      });
-
-      const renderMarkdown = (markdown) => {
-        try {
-          if (typeof marked !== 'undefined' && marked.parse) {
-            const html = marked.parse(markdown || '');
-            if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
-              return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
-            }
-            return html;
-          }
-        } catch (e) {
-          console.error("Markdown parse or sanitize error:", e);
-        }
-        return markdown || '';
-      };
-
-      const safeSanitize = (text) => {
-        try {
+    const renderMarkdown = (markdown) => {
+      try {
+        if (typeof marked !== 'undefined' && marked.parse) {
+          const html = marked.parse(markdown || '');
           if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
-            return DOMPurify.sanitize(text);
+            return DOMPurify.sanitize(html, { USE_PROFILES: { html: true } });
           }
-        } catch (e) {
-          console.error("Sanitization error:", e);
+          return html;
         }
-        return text || '';
-      };
+      } catch (e) {
+        console.error("Markdown parse or sanitize error:", e);
+      }
+      return markdown || '';
+    };
 
-      // Emotion mappings to beautiful emojis and custom CSS classes
-      const EMOTION_MAP = {
-        "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
-        "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
-        "Love": { emoji: "💖", label: "Love", class: "emo-love" },
-        "Anger": { emoji: "🧡", label: "Anger", class: "emo-anger" },
-        "Fear": { emoji: "💜", label: "Fear", class: "emo-fear" },
-        "Surprise": { emoji: "💚", label: "Surprise", class: "emo-surprise" }
-      };
+    const safeSanitize = (text) => {
+      try {
+        if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+          return DOMPurify.sanitize(text);
+        }
+      } catch (e) {
+        console.error("Sanitization error:", e);
+      }
+      return text || '';
+    };
 
-      const addBubble = (text, role, metadata = null) => {
-        const wrapper = document.createElement('div');
-        wrapper.className = `bubble-wrapper ${role}-wrapper`;
+    // Emotion mappings to beautiful emojis and custom CSS classes
+    const EMOTION_MAP = {
+      "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
+      "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
+      "Love": { emoji: "💖", label: "Love", class: "emo-love" },
+      "Anger": { emoji: "🧡", label: "Anger", class: "emo-anger" },
+      "Fear": { emoji: "💜", label: "Fear", class: "emo-fear" },
+      "Surprise": { emoji: "💚", label: "Surprise", class: "emo-surprise" }
+    };
 
-        // Create Avatar element
-        const avatar = document.createElement('div');
-        avatar.className = `avatar ${role}-avatar`;
-        if (role === 'assistant') {
-          avatar.innerHTML = `
+    const addBubble = (text, role, metadata = null) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = `bubble-wrapper ${role}-wrapper`;
+
+      // Create Avatar element
+      const avatar = document.createElement('div');
+      avatar.className = `avatar ${role}-avatar`;
+      if (role === 'assistant') {
+        avatar.innerHTML = `
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
               <path d="M19 10v1a7 7 0 0 1-14 0v-1"/>
               <line x1="12" y1="19" x2="12" y2="22"/>
             </svg>
           `;
-        } else {
-          avatar.innerHTML = `
+      } else {
+        avatar.innerHTML = `
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
               <circle cx="12" cy="7" r="4"/>
             </svg>
           `;
-        }
+      }
 
-        // Create bubble content wrapper (holds bubble + pills + citations)
-        const contentArea = document.createElement('div');
-        contentArea.className = 'bubble-content-area';
+      // Create bubble content wrapper (holds bubble + pills + citations)
+      const contentArea = document.createElement('div');
+      contentArea.className = 'bubble-content-area';
 
-        const bubble = document.createElement('div');
-        bubble.className = `bubble ${role}`;
+      const bubble = document.createElement('div');
+      bubble.className = `bubble ${role}`;
 
-        if (role === 'assistant') {
-          if (text === 'Thinking...') {
-            bubble.innerHTML = `
+      if (role === 'assistant') {
+        if (text === 'Thinking...') {
+          bubble.innerHTML = `
               <div class="typing-indicator">
                 <span></span>
                 <span></span>
                 <span></span>
               </div>
             `;
-          } else {
-            // Replace [1], [2], [3] citations with pretty interactive inline-citation badges
-            let formattedText = text || '';
-            formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
-              return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
-            });
-            bubble.innerHTML = renderMarkdown(formattedText);
-          }
         } else {
-          bubble.textContent = text;
+          // Replace [1], [2], [3] citations with pretty interactive inline-citation badges
+          let formattedText = text || '';
+          formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
+            return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
+          });
+          bubble.innerHTML = renderMarkdown(formattedText);
+        }
+      } else {
+        bubble.textContent = text;
+      }
+
+      contentArea.appendChild(bubble);
+
+      // Add Metadata pills if present (for assistant only)
+      if (role === 'assistant' && metadata && text !== 'Thinking...') {
+        const metaContainer = document.createElement('div');
+        metaContainer.className = 'meta-pills';
+
+        // 1. Language pill
+        if (metadata.language) {
+          const langPill = document.createElement('span');
+          langPill.className = 'meta-pill language-pill';
+          langPill.innerHTML = `🌐 ${metadata.language}`;
+          metaContainer.appendChild(langPill);
         }
 
-        contentArea.appendChild(bubble);
-
-        // Add Metadata pills if present (for assistant only)
-        if (role === 'assistant' && metadata && text !== 'Thinking...') {
-          const metaContainer = document.createElement('div');
-          metaContainer.className = 'meta-pills';
-
-          // 1. Language pill
-          if (metadata.language) {
-            const langPill = document.createElement('span');
-            langPill.className = 'meta-pill language-pill';
-            langPill.innerHTML = `🌐 ${metadata.language}`;
-            metaContainer.appendChild(langPill);
-          }
-
-          // 2. Emotion pills
-          if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
-            metadata.emotion.forEach(emo => {
-              const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
-              const emoPill = document.createElement('span');
-              emoPill.className = `meta-pill emotion-pill ${emoConfig.class}`;
-              emoPill.innerHTML = `${emoConfig.emoji} ${emoConfig.label}`;
-              metaContainer.appendChild(emoPill);
-            });
-          }
-
-          // 3. Intent pill
-          if (metadata.intent) {
-            const intentPill = document.createElement('span');
-            intentPill.className = 'meta-pill intent-pill';
-            let cleanIntent = metadata.intent.replace(/_/g, ' ');
-            if (cleanIntent === 'asking mental health question') cleanIntent = 'Counseling';
-            intentPill.innerHTML = `🧠 ${cleanIntent.charAt(0).toUpperCase() + cleanIntent.slice(1)}`;
-            metaContainer.appendChild(intentPill);
-          }
-
-          contentArea.appendChild(metaContainer);
+        // 2. Emotion pills
+        if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
+          metadata.emotion.forEach(emo => {
+            const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
+            const emoPill = document.createElement('span');
+            emoPill.className = `meta-pill emotion-pill ${emoConfig.class}`;
+            emoPill.innerHTML = `${emoConfig.emoji} ${emoConfig.label}`;
+            metaContainer.appendChild(emoPill);
+          });
         }
 
-        // Arrange elements in bubble wrapper depending on role
-        if (role === 'assistant') {
-          wrapper.appendChild(avatar);
-          wrapper.appendChild(contentArea);
-        } else {
-          wrapper.appendChild(contentArea);
-          wrapper.appendChild(avatar);
+        // 3. Intent pill
+        if (metadata.intent) {
+          const intentPill = document.createElement('span');
+          intentPill.className = 'meta-pill intent-pill';
+          let cleanIntent = metadata.intent.replace(/_/g, ' ');
+          if (cleanIntent === 'asking mental health question') cleanIntent = 'Counseling';
+          intentPill.innerHTML = `🧠 ${cleanIntent.charAt(0).toUpperCase() + cleanIntent.slice(1)}`;
+          metaContainer.appendChild(intentPill);
         }
 
-        chatWindow.appendChild(wrapper);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-        return wrapper;
-      };
+        contentArea.appendChild(metaContainer);
+      }
 
-      const addCitations = (resources, parentWrapper) => {
-        if (!Array.isArray(resources) || resources.length === 0) return;
+      // Arrange elements in bubble wrapper depending on role
+      if (role === 'assistant') {
+        wrapper.appendChild(avatar);
+        wrapper.appendChild(contentArea);
+      } else {
+        wrapper.appendChild(contentArea);
+        wrapper.appendChild(avatar);
+      }
 
-        const contentArea = parentWrapper.querySelector('.bubble-content-area');
-        if (!contentArea) return;
+      chatWindow.appendChild(wrapper);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+      return wrapper;
+    };
 
-        const citationWrapper = document.createElement('div');
-        citationWrapper.className = 'citation-wrapper';
+    const addCitations = (resources, parentWrapper) => {
+      if (!Array.isArray(resources) || resources.length === 0) return;
 
-        // Expandable Title Header
-        const header = document.createElement('div');
-        header.className = 'citation-header';
-        header.innerHTML = `
+      const contentArea = parentWrapper.querySelector('.bubble-content-area');
+      if (!contentArea) return;
+
+      const citationWrapper = document.createElement('div');
+      citationWrapper.className = 'citation-wrapper';
+
+      // Expandable Title Header
+      const header = document.createElement('div');
+      header.className = 'citation-header';
+      header.innerHTML = `
           <span class="citation-header-title">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px; display: inline-block; vertical-align: text-bottom; margin-right: 4px;">
               <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/>
@@ -255,27 +296,27 @@
           </svg>
         `;
 
-        const body = document.createElement('div');
-        body.className = 'citation-body collapsed';
+      const body = document.createElement('div');
+      body.className = 'citation-body collapsed';
 
-        resources.forEach((resource, index) => {
-          const item = document.createElement('div');
-          item.className = 'citation-item';
-          
-          const titleText = `Ref #MHC-${index + 1}`;
-          const score = resource.score ? resource.score : 0.0;
-          
-          let scoreLabel = '';
-          let scoreClass = 'med';
-          if (score >= 0 && score <= 1.0) {
-            scoreLabel = `${(score * 100).toFixed(0)}% Match`;
-            if (score >= 0.7) scoreClass = 'high';
-          } else {
-            scoreLabel = `Score ${score.toFixed(1)}`;
-            if (score >= 2.0) scoreClass = 'high';
-          }
-          
-          item.innerHTML = `
+      resources.forEach((resource, index) => {
+        const item = document.createElement('div');
+        item.className = 'citation-item';
+
+        const titleText = `Ref #MHC-${index + 1}`;
+        const score = resource.score ? resource.score : 0.0;
+
+        let scoreLabel = '';
+        let scoreClass = 'med';
+        if (score >= 0 && score <= 1.0) {
+          scoreLabel = `${(score * 100).toFixed(0)}% Match`;
+          if (score >= 0.7) scoreClass = 'high';
+        } else {
+          scoreLabel = `Score ${score.toFixed(1)}`;
+          if (score >= 2.0) scoreClass = 'high';
+        }
+
+        item.innerHTML = `
             <div class="citation-label">
               <span class="citation-index">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;">
@@ -300,85 +341,97 @@
               </div>
             ` : ''}
           `;
-          body.appendChild(item);
-        });
-
-        // Toggle Expand/Collapse
-        header.addEventListener('click', () => {
-          body.classList.toggle('collapsed');
-          header.classList.toggle('expanded');
-        });
-
-        citationWrapper.appendChild(header);
-        citationWrapper.appendChild(body);
-        contentArea.appendChild(citationWrapper);
-        chatWindow.scrollTop = chatWindow.scrollHeight;
-      };
-
-      window.highlightSource = (event, index) => {
-        event.stopPropagation();
-        const wrapper = event.target.closest('.bubble-wrapper');
-        if (!wrapper) return;
-        const header = wrapper.querySelector('.citation-header');
-        const body = wrapper.querySelector('.citation-body');
-        if (header && body) {
-          if (body.classList.contains('collapsed')) {
-            body.classList.remove('collapsed');
-            header.classList.add('expanded');
-          }
-          const items = body.querySelectorAll('.citation-item');
-          if (items.length >= index) {
-            const targetItem = items[index - 1];
-            targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-            targetItem.classList.remove('highlight-pulse');
-            void targetItem.offsetWidth; // Force reflow
-            targetItem.classList.add('highlight-pulse');
-          }
-        }
-      };
-
-      chatForm.addEventListener('submit', async (event) => {
-        event.preventDefault();
-        const query = queryInput.value.trim();
-        if (!query) return;
-
-        // Reset input area
-        queryInput.value = '';
-        queryInput.style.height = 'auto';
-
-        // Add user bubble and thinking state
-        addBubble(query, 'user');
-        const thinkingBubble = addBubble('Thinking...', 'assistant');
-
-        try {
-          const response = await fetch('/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query }),
-          });
-
-          const data = await response.json();
-          
-          // Remove the thinking state bubble
-          thinkingBubble.remove();
-
-          if (response.ok && data.answer) {
-            // Add assistant bubble with full metadata pills
-            const bubbleWrapper = addBubble(data.answer, 'assistant', {
-              language: data.language,
-              emotion: data.emotion,
-              intent: data.intent
-            });
-            // Add expandable resources below response inside the bubble wrapper
-            addCitations(data.resources, bubbleWrapper);
-          } else {
-            addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
-          }
-        } catch (error) {
-          thinkingBubble.remove();
-          addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
-        }
+        body.appendChild(item);
       });
-    </script>
-  </body>
+
+      // Toggle Expand/Collapse
+      header.addEventListener('click', () => {
+        body.classList.toggle('collapsed');
+        header.classList.toggle('expanded');
+      });
+
+      citationWrapper.appendChild(header);
+      citationWrapper.appendChild(body);
+      contentArea.appendChild(citationWrapper);
+      chatWindow.scrollTop = chatWindow.scrollHeight;
+    };
+
+    window.highlightSource = (event, index) => {
+      event.stopPropagation();
+      const wrapper = event.target.closest('.bubble-wrapper');
+      if (!wrapper) return;
+      const header = wrapper.querySelector('.citation-header');
+      const body = wrapper.querySelector('.citation-body');
+      if (header && body) {
+        if (body.classList.contains('collapsed')) {
+          body.classList.remove('collapsed');
+          header.classList.add('expanded');
+        }
+        const items = body.querySelectorAll('.citation-item');
+        if (items.length >= index) {
+          const targetItem = items[index - 1];
+          targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          targetItem.classList.remove('highlight-pulse');
+          void targetItem.offsetWidth; // Force reflow
+          targetItem.classList.add('highlight-pulse');
+        }
+      }
+    };
+
+    chatForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const query = queryInput.value.trim();
+      if (!query) return;
+
+      // Reset input area
+      queryInput.value = '';
+      queryInput.style.height = 'auto';
+
+      // Add user bubble and thinking state
+      addBubble(query, 'user');
+      const thinkingBubble = addBubble('Thinking...', 'assistant');
+
+      // Slice history to send optimized rolling window
+      const historyToSend = chatHistory.slice(-6);
+
+      // Add user query to history
+      chatHistory.push({ role: 'user', content: query });
+
+      try {
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, history: historyToSend }),
+        });
+
+        const data = await response.json();
+
+        // Remove the thinking state bubble
+        thinkingBubble.remove();
+
+        if (response.ok && data.answer) {
+          // Add assistant bubble with full metadata pills
+          const bubbleWrapper = addBubble(data.answer, 'assistant', {
+            language: data.language,
+            emotion: data.emotion,
+            intent: data.intent
+          });
+          // Add expandable resources below response inside the bubble wrapper
+          addCitations(data.resources, bubbleWrapper);
+
+          // Add assistant response to history
+          chatHistory.push({ role: 'assistant', content: data.answer });
+        } else {
+          chatHistory.pop(); // Remove failed user message from history
+          addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
+        }
+      } catch (error) {
+        thinkingBubble.remove();
+        chatHistory.pop(); // Remove failed user message from history
+        addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
+      }
+    });
+  </script>
+</body>
+
 </html>

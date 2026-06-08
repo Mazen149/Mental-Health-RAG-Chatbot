@@ -28,9 +28,9 @@ else:
 
 
 class Intent(BaseModel):
-    type: Literal["general", "out_of_scope", "asking_mental_health_question", "crisis"] = Field(
+    type: Literal["greeting", "goodbye", "gratitude", "out_of_scope", "asking_mental_health_question", "crisis"] = Field(
         ...,
-        description="general: for greeting, goodbye, thanks; out_of_scope: for off-topic queries; asking_mental_health_question: for clinical mental health queries; crisis: for queries indicating self-harm, suicide, or crisis",
+        description="greeting: for greeting, introduction, small talk; goodbye: for farewell; gratitude: for expressions of thanks; out_of_scope: for off-topic queries; asking_mental_health_question: for clinical mental health queries; crisis: for queries indicating self-harm, suicide, or crisis",
     )
     confidence: float = Field(
         ...,
@@ -56,11 +56,27 @@ class IntentClassifier:
         else:
             self.groq_client = None
 
+        self.model_name = os.getenv("GROQ_CLASSIFIER_MODEL", "openai/gpt-oss-20b")
+
         self.embedding_examples = {
-            "general": [
-                "hello", "thanks", "goodbye", "hi there", "thank you",
-                "مرحبا", "شكرا", "مع السلامة", "ہیلو", "شکریہ",
-                "hola", "gracias", "adiós", "bonjour", "merci", "au revoir"
+            "greeting": [
+                "hello", "hi there", "hey", "greetings", "good morning", "good afternoon", "good evening", "hiya",
+                "hello, how are you", "how are you", "how's it going", "how are you doing", "how are yoy", "nice to meet you",
+                "my name is john", "i am john", "call me john", "what is my name", "who am i", "my name is", "tell me my name",
+                "who are you", "what is your name", "what can you do", "how can you help me",
+                "مرحبا", "أهلاً", "اهلا", "السلام عليكم", "سلام عليكم", "صباح الخير", "كيف حالك", "اسمي احمد", "انا احمد", "ما هو اسمي", "من انت", "ما اسمك",
+                "ہیلو", "السلام علیکم", "آپ کیسے ہیں", "میرا نام علی ہے", "میرا نام کیا ہے",
+                "hola", "buenos días", "buenas tardes", "buenas noches", "bonjour", "salut", "bonsoir", "ciao", "buongiorno", "你好"
+            ],
+            "goodbye": [
+                "goodbye", "bye", "see you", "take care", "farewell", "bye bye",
+                "مع السلامة", "إلى اللقاء", "وداعا", "خدا حافظ",
+                "tschüss", "auf wiedersehen", "au revoir", "adiós", "arrivederci", "再见"
+            ],
+            "gratitude": [
+                "thanks", "thank you", "thx", "appreciate it", "thank you so much",
+                "شكرا", "شكراً", "تسلم", "جزاك الله خيراً", "شکریہ", "بہت شکریہ",
+                "danke", "merci", "gracias", "grazie", "asante", "谢谢"
             ],
             "out_of_scope": [
                 "what is the weather like", "tell me a joke", "what is the latest news", "what sports scores are",
@@ -91,19 +107,39 @@ class IntentClassifier:
             api_key=hf_token,
         )
 
+        try:
+            from sentence_transformers import SentenceTransformer
+            print("--> [Intent Classifier] Loading local sentence-transformer model...")
+            self.local_model = SentenceTransformer(self.embedding_model)
+            self.use_local = True
+        except Exception as e:
+            print(f"--> [Intent Classifier] Local sentence-transformer not used: {e}. Using HF API Client.")
+            self.use_local = False
+
         # Precompute normalized embeddings for example sentences
-        self.embedding_examples_embeddings = {
-            intent_type: self._normalize_embeddings(
-                np.asarray(
-                    self.embedding_client.feature_extraction(
-                        examples,
-                        model=self.embedding_model,
-                    ),
-                    dtype=np.float32,
+        if self.use_local:
+            self.embedding_examples_embeddings = {
+                intent_type: self._normalize_embeddings(
+                    np.asarray(
+                        self.local_model.encode(examples),
+                        dtype=np.float32,
+                    )
                 )
-            )
-            for intent_type, examples in self.embedding_examples.items()
-        }
+                for intent_type, examples in self.embedding_examples.items()
+            }
+        else:
+            self.embedding_examples_embeddings = {
+                intent_type: self._normalize_embeddings(
+                    np.asarray(
+                        self.embedding_client.feature_extraction(
+                            examples,
+                            model=self.embedding_model,
+                        ),
+                        dtype=np.float32,
+                    )
+                )
+                for intent_type, examples in self.embedding_examples.items()
+            }
 
     def classify(self, text: str, language: str = "English") -> Intent:
         # Check crisis/self-harm keywords first as an instant safety bypass for all languages!
@@ -151,7 +187,7 @@ class IntentClassifier:
                         {"role": "system", "content": self._system_prompt()},
                         {"role": "user", "content": text}
                     ],
-                    model="openai/gpt-oss-20b",
+                    model=self.model_name,
                     temperature=0.0,
                     response_format={"type": "json_object"}
                 )
@@ -165,7 +201,7 @@ class IntentClassifier:
                     pass
 
         # Return default if Groq fails or is not available
-        return Intent(type="general", confidence=0.5, classifier="llm")
+        return Intent(type="greeting", confidence=0.5, classifier="llm")
 
     def _parse_llm_intent(self, content: str) -> Intent:
         cleaned = str(content).strip()
@@ -179,9 +215,9 @@ class IntentClassifier:
             cleaned = cleaned[start : end + 1]
 
         data = json.loads(cleaned)
-        intent_type = data.get("type", "general")
-        if intent_type not in {"general", "out_of_scope", "asking_mental_health_question", "crisis"}:
-            intent_type = "general"
+        intent_type = data.get("type", "greeting")
+        if intent_type not in {"greeting", "goodbye", "gratitude", "out_of_scope", "asking_mental_health_question", "crisis"}:
+            intent_type = "greeting"
 
         confidence = data.get("confidence", 0.5)
         try:
@@ -199,11 +235,13 @@ class IntentClassifier:
     def _system_prompt(self) -> str:
         return (
             "You are a strict intent classification engine for a mental-health support assistant. "
-            "Classify the user's message into exactly one label: general, out_of_scope, asking_mental_health_question, or crisis. "
-            "Use general only for greetings, goodbyes, and thanks. "
-            "Use crisis for any query containing suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself. "
-            "Use asking_mental_health_question for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness. "
-            "Use out_of_scope for everything else that is not about mental health. "
+            "Classify the user's message into exactly one label: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis.\n"
+            "Use greeting for greetings, introductions (e.g. sharing or asking about names), and basic small talk about the assistant or user's state (e.g. how are you).\n"
+            "Use goodbye for farewells and parting words.\n"
+            "Use gratitude for expressions of thanks or appreciation.\n"
+            "Use crisis for any query containing suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.\n"
+            "Use asking_mental_health_question for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.\n"
+            "Use out_of_scope for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).\n"
             "Return only valid JSON with exactly these keys: type, confidence, classifier. "
             "The classifier value must always be llm. "
             "Confidence must be a number from 0 to 1 reflecting how sure you are. "
@@ -211,10 +249,13 @@ class IntentClassifier:
         )
 
     def _get_embedding(self, text: str) -> np.ndarray:
-        embedding = self.embedding_client.feature_extraction(
-            text,
-            model=self.embedding_model,
-        )
+        if self.use_local:
+            embedding = self.local_model.encode(text)
+        else:
+            embedding = self.embedding_client.feature_extraction(
+                text,
+                model=self.embedding_model,
+            )
         return self._normalize_embeddings(np.asarray(embedding, dtype=np.float32))
 
     @staticmethod
@@ -259,10 +300,14 @@ class IntentRouter:
         elif intent == "out_of_scope":
             action = "decline"
 
-        # Map 'general' to 'greeting' template response as a fallback
+        # Map to template response as a fallback
         template = None
-        if intent == "general":
+        if intent == "greeting":
             template = "Hello! I'm here to support you with mental health topics. Feel free to share what's on your mind. 😊"
+        elif intent == "goodbye":
+            template = "Goodbye! Take care of yourself. I am always here if you need support."
+        elif intent == "gratitude":
+            template = "You're welcome! I'm glad I could help."
         elif intent == "out_of_scope":
             template = "I'm specialised in mental health support, so I can't help with that topic. If you have questions about anxiety, depression, stress, or emotional wellbeing, I'm here for you! 💙"
 

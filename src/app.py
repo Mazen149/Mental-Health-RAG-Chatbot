@@ -45,10 +45,25 @@ from .router import route_query
 # ------------------------------------------------------------------------------
 # 2. Pydantic API Schemas
 # ------------------------------------------------------------------------------
+class ChatMessage(BaseModel):
+    role: str = Field(
+        ...,
+        description="The role of the message sender: 'user' or 'assistant'."
+    )
+    content: str = Field(
+        ...,
+        description="The text content of the message."
+    )
+
+
 class ChatRequest(BaseModel):
     query: str = Field(
         ..., 
         description="The user's query or message to the mental health chatbot."
+    )
+    history: List[ChatMessage] | None = Field(
+        None,
+        description="The recent chat history turns for conversational context."
     )
 
 
@@ -269,7 +284,7 @@ async def chat(request: ChatRequest) -> ChatResponse:
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
 
-    result = await route_query(request.query, rag)
+    result = await route_query(request.query, rag, history=request.history)
     if not result or "answer" not in result:
         raise HTTPException(status_code=500, detail="Failed to generate a response.")
 

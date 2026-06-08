@@ -686,3 +686,35 @@ button[type="submit"]:active {
   margin: 0 -10px;
 }
 
+/* Clear Chat Button styling */
+.chat-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.clear-btn {
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  padding: 4px 12px;
+  border-radius: 20px;
+  color: #f87171;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.clear-btn:hover {
+  background: rgba(239, 68, 68, 0.18);
+  border-color: rgba(239, 68, 68, 0.3);
+  transform: translateY(-1px);
+}
+
+.clear-btn:active {
+  transform: translateY(0);
+}
+
+

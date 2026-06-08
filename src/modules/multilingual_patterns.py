@@ -15,143 +15,109 @@ LANGUAGES = [
     "Hindi", "Italian", "Japanese", "Dutch", "Polish", "Portuguese", "Russian", 
     "Swahili", "Thai", "Turkish", "Urdu", "Vietnamese", "Chinese"
 ]
+# Multilingual greeting patterns by language for exact language matching
+GREETING_PATTERNS_BY_LANG = {
+    "Arabic": [r"مرحبا", r"أهلاً", r"اهلا", r"السلام\s*عليكم", r"سلام\s*عليكم", r"سلام"],
+    "Bulgarian": [r"здравей", r"здравейте", r"добър\s*ден"],
+    "German": [r"hallo", r"guten\s*tag", r"hi", r"grüß\s*gott"],
+    "Greek": [r"γεια", r"χαίρετε", r"καλημέρα"],
+    "English": [r"hello", r"hi", r"hey", r"greetings", r"good\s*morning", r"good\s*afternoon", r"good\s*evening", r"hiya", r"welcome"],
+    "Spanish": [r"hola", r"buenos\s*días", r"buenos\s*dias", r"buenas\s*tardes", r"buenas\s*noches"],
+    "French": [r"bonjour", r"salut", r"bonsoir", r"coucou"],
+    "Hindi": [r"नमस्ते", r"नमस्कार", r"हैलो"],
+    "Italian": [r"ciao", r"salve", r"buongiorno"],
+    "Japanese": [r"こんにちは", r"おはよう", r"こんばんは"],
+    "Dutch": [r"hallo", r"hoi", r"goedemorgen", r"goedenavond"],
+    "Polish": [r"cześć", r"czesc", r"dzień\s*dobry", r"dzien\s*dobry", r"witaj"],
+    "Portuguese": [r"olá", r"ola", r"oi", r"bom\s*dia", r"boa\s*tarde"],
+    "Russian": [r"привет", r"здравствуйте", r"доброе\s*утро"],
+    "Swahili": [r"jambo", r"mambo", r"habari"],
+    "Thai": [r"สวัสดี", r"หวัดดี"],
+    "Turkish": [r"merhaba", r"selam", r"günaydın", r"gunaydin"],
+    "Urdu": [r"ہیلو", r"السلام\s*علیکم", r"آداب"],
+    "Vietnamese": [r"xin\s*chào", r"xin\s*chao", r"chào\s*bạn", r"chao\s*ban"],
+    "Chinese": [r"你好", r"您好", r"早上好", r"下午好", r"晚上好"]
+}
 
-# Multilingual greeting patterns for regex matching
-GREETING_PATTERNS = [
-    # Arabic
-    r"مرحبا", r"أهلاً", r"اهلا", r"السلام\s*عليكم", r"سلام\s*عليكم", r"سلام",
-    # Bulgarian
-    r"здравей", r"здравейте", r"добър\s*ден",
-    # German
-    r"hallo", r"guten\s*tag", r"hi", r"grüß\s*gott",
-    # Greek
-    r"γεια", r"χαίρετε", r"καλημέρα",
-    # English
-    r"hello", r"hi", r"hey", r"greetings", r"good\s*morning", r"good\s*afternoon", r"good\s*evening", r"hiya", r"welcome",
-    # Spanish
-    r"hola", r"buenos\s*días", r"buenos\s*dias", r"buenas\s*tardes", r"buenas\s*noches",
-    # French
-    r"bonjour", r"salut", r"bonsoir", r"coucou",
-    # Hindi
-    r"नमस्ते", r"नमस्कार", r"हैलो",
-    # Italian
-    r"ciao", r"salve", r"buongiorno",
-    # Japanese
-    r"こんにちは", r"おはよう", r"こんばんは"
-    # Dutch
-    r"hallo", r"hoi", r"goedemorgen", r"goedenavond",
-    # Polish
-    r"cześć", r"czesc", r"dzień\s*dobry", r"dzien\s*dobry", r"witaj",
-    # Portuguese
-    r"olá", r"ola", r"oi", r"bom\s*dia", r"boa\s*tarde",
-    # Russian
-    r"привет", r"здравствуйте", r"доброе\s*утро",
-    # Swahili
-    r"jambo", r"mambo", r"habari",
-    # Thai
-    r"สวัสดี", r"หวัดดี",
-    # Turkish
-    r"merhaba", r"selam", r"günaydın", r"gunaydin",
-    # Urdu
-    r"ہیلو", r"السلام\s*علیکم", r"آداب",
-    # Vietnamese
-    r"xin\s*chào", r"xin\s*chao", r"chào\s*bạn", r"chao\s*ban",
-    # Chinese
-    r"你好", r"您好", r"早上好", r"下午好", r"晚上好"
-]
+# Multilingual goodbye patterns by language for exact language matching
+GOODBYE_PATTERNS_BY_LANG = {
+    "Arabic": [r"مع\s*السلامة", r"إلى\s*اللقاء", r"الى\s*اللقاء", r"وداعا", r"وداعاً"],
+    "Bulgarian": [r"довиждане", r"чао"],
+    "German": [r"tschüss", r"tschuss", r"auf\s*wiedersehen", r"ciao"],
+    "Greek": [r"αντίο", r"γεια\s*σας", r"τα\s*λέμε"],
+    "English": [r"goodbye", r"bye", r"see\s*you", r"take\s*care", r"farewell"],
+    "Spanish": [r"adiós", r"adios", r"hasta\s*luego", r"nos\s*vemos"],
+    "French": [r"au\s*revoir", r"salut", r"à\s*bientôt", r"a\s*bientot"],
+    "Hindi": [r"अलविदा", r"फिर\s*मिलेंगे"],
+    "Italian": [r"arrivederci", r"ciao", r"a\s*presto"],
+    "Japanese": [r"さようなら", r"じゃあね", r"バイバイ"],
+    "Dutch": [r"doeg", r"tot\s*ziens", r"dag"],
+    "Polish": [r"do\s*widzenia", r"pa", r"na\s*razie"],
+    "Portuguese": [r"adeus", r"tchau", r"até\s*logo", r"ate\s*logo"],
+    "Russian": [r"пока", r"до\s*свидания", r"до\s*встречи"],
+    "Swahili": [r"kwa\s*heri", r"tutaonana"],
+    "Thai": [r"ลาก่อน"],
+    "Turkish": [r"hoşça\s*kal", r"hosca\s*kal", r"güle\s*güle", r"gule\s*gule", r"görüşürüz", r"gorusuruz"],
+    "Urdu": [r"خدا\s*حافظ", r"الوداع"],
+    "Vietnamese": [r"tạm\s*biệt", r"tam\s*biet", r"hẹn\s*gặp\s*lại", r"hen\s*gap\s*lai"],
+    "Chinese": [r"再见", r"拜拜"]
+}
 
-# Multilingual goodbye patterns for regex matching
-GOODBYE_PATTERNS = [
-    # Arabic
-    r"مع\s*السلامة", r"إلى\s*اللقاء", r"الى\s*اللقاء", r"وداعا", r"وداعاً",
-    # Bulgarian
-    r"довиждане", r"чао",
-    # German
-    r"tschüss", r"tschuss", r"auf\s*wiedersehen", r"ciao",
-    # Greek
-    r"αντίο", r"γεια\s*σας", r"τα\s*λέμε",
-    # English
-    r"goodbye", r"bye", r"see\s*you", r"take\s*care", r"farewell",
-    # Spanish
-    r"adiós", r"adios", r"hasta\s*luego", r"nos\s*vemos",
-    # French
-    r"au\s*revoir", r"salut", r"à\s*bientôt", r"a\s*bientot",
-    # Hindi
-    r"अलविदा", r"फिर\s*मिलेंगे",
-    # Italian
-    r"arrivederci", r"ciao", r"a\s*presto",
-    # Japanese
-    r"さようなら", r"じゃあね", r"バイバイ",
-    # Dutch
-    r"doeg", r"tot\s*ziens", r"dag",
-    # Polish
-    r"do\s*widzenia", r"pa", r"na\s*razie",
-    # Portuguese
-    r"adeus", r"tchau", r"até\s*logo", r"ate\s*logo",
-    # Russian
-    r"пока", r"до\s*свидания", r"до\s*встречи",
-    # Swahili
-    r"kwa\s*heri", r"tutaonana",
-    # Thai
-    r"ลาก่อน",
-    # Turkish
-    r"hoşça\s*kal", r"hosca\s*kal", r"güle\s*güle", r"gule\s*gule", r"görüşürüz", r"gorusuruz",
-    # Urdu
-    r"خدا\s*حافظ", r"الوداع",
-    # Vietnamese
-    r"tạm\s*biệt", r"tam\s*biet", r"hẹn\s*gặp\s*lại", r"hen\s*gap\s*lai",
-    # Chinese
-    r"再见", r"拜拜"
-]
+# Multilingual gratitude patterns by language for exact language matching
+GRATITUDE_PATTERNS_BY_LANG = {
+    "Arabic": [r"شكرا", r"شكراً", r"شكر", r"جزاك\s*الله", r"تسلم"],
+    "Bulgarian": [r"благodarя", r"мерси", r"благodarности"],
+    "German": [r"danke", r"vielen\s*dank"],
+    "Greek": [r"ευχαριστώ", r"ευχαριστω"],
+    "English": [r"thanks", r"thank\s*you", r"thx", r"appreciate\s*it"],
+    "Spanish": [r"gracias", r"muchas\s*gracias"],
+    "French": [r"merci", r"merci\s*beaucoup"],
+    "Hindi": [r"धन्यवाद", r"शुक्रिया"],
+    "Italian": [r"grazie", r"grazie\s*mille"],
+    "Japanese": [r"ありがとう", r"ありがとうございます", r"どうも", r"感謝します"],
+    "Dutch": [r"dank\s*je", r"bedankt", r"dank\s*u"],
+    "Polish": [r"dziękuję", r"dziekuje", r"dzięki", r"dzeki"],
+    "Portuguese": [r"obrigado", r"obrigada"],
+    "Russian": [r"спасибо", r"благодарю"],
+    "Swahili": [r"asante", r"asante\s*sana"],
+    "Thai": [r"ขอบคุณ", r"ขอบใจ"],
+    "Turkish": [r"teşekkürler", r"tesekkurler", r"teşekkür\s*ederim", r"tesekkur\s*ederim", r"sağol", r"sagol"],
+    "Urdu": [r"شکریہ", r"بہت\s*شکریہ"],
+    "Vietnamese": [r"cảm\s*ơn", r"cam\s*on", r"cám\s*ơn", r"cam\s*on\s*ban"],
+    "Chinese": [r"谢谢", r"谢谢你"]
+}
 
-# Multilingual gratitude patterns for regex matching
-GRATITUDE_PATTERNS = [
-    # Arabic
-    r"شكرا", r"شكراً", r"شكر", r"جزاك\s*الله", r"تسلم",
-    # Bulgarian
-    r"благodarя", r"мерси",r"благodarности",
-    # German
-    r"danke", r"vielen\s*dank",
-    # Greek
-    r"ευχαριστώ", r"ευχαριστω",
-    # English
-    r"thanks", r"thank\s*you", r"thx", r"appreciate\s*it",
-    # Spanish
-    r"gracias", r"muchas\s*gracias",
-    # French
-    r"merci", r"merci\s*beaucoup",
-    # Hindi
-    r"धन्यवाद", r"शुक्रिया",
-    # Italian
-    r"grazie", r"grazie\s*mille",
-    # Japanese
-    r"ありがとう", r"ありがとうございます",r"どうも", r"感謝します",
-    # Dutch
-    r"dank\s*je", r"bedankt", r"dank\s*u",
-    # Polish
-    r"dziękuję", r"dziekuje", r"dzięki", r"dzeki",
-    # Portuguese
-    r"obrigado", r"obrigada",
-    # Russian
-    r"спасибо", r"благодарю",
-    # Swahili
-    r"asante", r"asante\s*sana",
-    # Thai
-    r"ขอบคุณ", r"ขอบใจ",
-    # Turkish
-    r"teşekkürler", r"tesekkurler", r"teşekkür\s*ederim", r"tesekkur\s*ederim", r"sağol", r"sagol",
-    # Urdu
-    r"شکریہ", r"بہت\s*شکریہ",
-    # Vietnamese
-    r"cảm\s*ơn", r"cam\s*on", r"cám\s*ơn", r"cam\s*on\s*ban",
-    # Chinese
-    r"谢谢", r"谢谢你"
-]
+# Flatten lists to maintain backward compatibility
+GREETING_PATTERNS = []
+for patterns in GREETING_PATTERNS_BY_LANG.values():
+    GREETING_PATTERNS.extend(patterns)
 
-# Compile regex patterns
+GOODBYE_PATTERNS = []
+for patterns in GOODBYE_PATTERNS_BY_LANG.values():
+    GOODBYE_PATTERNS.extend(patterns)
+
+GRATITUDE_PATTERNS = []
+for patterns in GRATITUDE_PATTERNS_BY_LANG.values():
+    GRATITUDE_PATTERNS.extend(patterns)
+
+# Compile flat regex patterns
 GREETING_REGEX = re.compile(r"^(" + "|".join(GREETING_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
 GOODBYE_REGEX = re.compile(r"^(" + "|".join(GOODBYE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
 GRATITUDE_REGEX = re.compile(r"^(" + "|".join(GRATITUDE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
+
+# Compile language-specific regex patterns
+GREETING_REGEX_BY_LANG = {
+    lang: re.compile(r"^(" + "|".join(patterns) + r")(\s+.*)?$", re.IGNORECASE)
+    for lang, patterns in GREETING_PATTERNS_BY_LANG.items()
+}
+GOODBYE_REGEX_BY_LANG = {
+    lang: re.compile(r"^(" + "|".join(patterns) + r")(\s+.*)?$", re.IGNORECASE)
+    for lang, patterns in GOODBYE_PATTERNS_BY_LANG.items()
+}
+GRATITUDE_REGEX_BY_LANG = {
+    lang: re.compile(r"^(" + "|".join(patterns) + r")(\s+.*)?$", re.IGNORECASE)
+    for lang, patterns in GRATITUDE_PATTERNS_BY_LANG.items()
+}
 
 
 # Direct friendly responses for each language

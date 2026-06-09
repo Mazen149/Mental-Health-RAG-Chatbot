@@ -13,6 +13,7 @@ from pathlib import Path
 import re
 
 from dotenv import load_dotenv
+from langsmith import traceable
 
 # ------------------------------------------------------------------------------
 # 1. Environment Loading & Project Root Identification
@@ -104,6 +105,7 @@ def get_direct_gratitude(language: str) -> str:
     """Returns a direct warm gratitude acknowledgement in the user's language."""
     return GRATITUDE_RESPONSES.get(language, GRATITUDE_RESPONSES["English"])
 
+@traceable(name="serene.route_query", run_type="chain")
 async def route_query(query: str, rag_instance, history: list = None) -> dict:
     """
     Routes the user query dynamically in an asynchronous manner.

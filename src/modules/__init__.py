@@ -5,12 +5,19 @@ Exposes key modules and convenience wrappers with signatures compatible with rou
 
 from .language_detector import LanguageDetector
 from .emotion_classifier import EmotionClassifier
-from .intent_classifier import IntentClassifier, IntentRouter
 
 # Lazy singletons for the convenience functions
 _language_detector = None
 _emotion_classifier = None
 _intent_classifier = None
+
+
+def __getattr__(name: str):
+    if name in {"IntentClassifier", "IntentRouter"}:
+        from .intent_classifier import IntentClassifier, IntentRouter
+
+        return IntentClassifier if name == "IntentClassifier" else IntentRouter
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def detect_language(text: str) -> str:

@@ -146,7 +146,7 @@ def check_medical_advice(answer: str, language: str) -> str:
 
 
 
-from .prompts import (
+from ..prompts.prompts import (
     RetrievalRouterModule,
     QueryCondenserModule,
     GroundedResponseModule,

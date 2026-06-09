@@ -159,6 +159,8 @@ class MentalHealthRAG:
         
         # Generation model and chunk settings
         self.model_name = os.getenv("GROQ_GENERATION_MODEL", "openai/gpt-oss-20b")
+        self.max_contexts = int(os.getenv("RAG_MAX_CONTEXTS", "5"))
+        self.min_rerank_score = float(os.getenv("RAG_MIN_RERANK_SCORE", "0.12"))
         self.chunk_size = 500
         self.chunk_overlap = 100
 
@@ -307,12 +309,15 @@ class MentalHealthRAG:
 
         print("--> [RAG Setup] Initializing hybrid ensemble retriever...")
         bm25_retriever = BM25Retriever.from_documents(documents)
-        bm25_retriever.k = 5
-        qdrant_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
+        bm25_retriever.k = 8
+        qdrant_retriever = self.vectorstore.as_retriever(
+            search_kwargs={"k": 8, "fetch_k": 20, "lambda_mult": 0.35},
+            search_type="mmr",
+        )
 
         self.ensemble_retriever = EnsembleRetriever(
             retrievers=[bm25_retriever, qdrant_retriever],
-            weights=[0.45, 0.55]
+            weights=[0.55, 0.45]
         )
 
     def rerank_documents(self, query: str, docs: List[Document]) -> List[float]:
@@ -358,7 +363,8 @@ class MentalHealthRAG:
             doc.metadata["rerank_score"] = float(score)
             docs_with_scores.append(doc)
 
-        return docs_with_scores
+        filtered_docs = [doc for doc in docs_with_scores if doc.metadata.get("rerank_score", 0.0) >= self.min_rerank_score]
+        return filtered_docs or docs_with_scores[: self.max_contexts]
 
     def query(
         self, 
@@ -414,17 +420,36 @@ class MentalHealthRAG:
         if not reranked_docs:
             return {"answer": "No relevant context found.", "resources": []}
 
+        selected_docs = reranked_docs[: self.max_contexts]
         resources = [
             {
                 "score": doc.metadata.get("rerank_score", 0.0),
                 "page_content": doc.page_content,
                 "response": doc.metadata.get("response", ""),
             }
-            for doc in reranked_docs[:3]
+            for doc in selected_docs
         ]
 
-        top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:3])])
-        sys_prompt = system_prompt or "You are a compassionate mental health assistant. Combine context into a supportive answer."
+        context_blocks = []
+        for i, res in enumerate(resources, start=1):
+            question_part = ""
+            response_part = res["response"].strip()
+            page_content = res["page_content"].strip()
+            if "\n\n" in page_content:
+                question_part = page_content.split("\n\n", 1)[0].strip()
+            if not question_part:
+                question_part = "Unknown source question"
+            response_excerpt = " ".join(response_part.split()[:180])
+            context_blocks.append(
+                f"Context [{i}]\nSource question: {question_part}\nSource answer excerpt: {response_excerpt}"
+            )
+
+        top_context = "\n\n".join(context_blocks)
+        sys_prompt = system_prompt or (
+            "You are a compassionate mental health assistant. Answer using only the provided context. "
+            "If the context does not contain enough information, say you do not have enough information. "
+            "Cite the specific context number after each sentence that relies on it."
+        )
 
         formatted_messages = [{"role": "system", "content": sys_prompt}]
 
@@ -451,11 +476,43 @@ class MentalHealthRAG:
         chat_completion = self.client.chat.completions.create(
             messages=formatted_messages,
             model=self.model_name,
-            temperature=0.7
+            temperature=0.0
         )
 
+        draft_answer = chat_completion.choices[0].message.content or ""
+        grounded_prompt = (
+            "You are a strict grounding editor for a mental health assistant.\n"
+            "Rewrite the draft answer so that every factual claim is directly supported by the provided context.\n"
+            "Remove any unsupported, speculative, or overly specific claims.\n"
+            "If the context does not support a safe answer, respond exactly with: "
+            "\"I'm sorry, I don't have enough information to answer that.\" \n"
+            "Keep the answer concise, warm, and empathetic.\n"
+            "Use only the provided context and keep citations in square brackets like [1], [2], or [3].\n"
+            "Return only the final answer text."
+        )
+        grounding_messages = [
+            {"role": "system", "content": grounded_prompt},
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {user_query}\n\n"
+                    f"Context:\n{top_context}\n\n"
+                    f"Draft answer:\n{draft_answer}"
+                ),
+            },
+        ]
+        try:
+            grounded_completion = self.client.chat.completions.create(
+                messages=grounding_messages,
+                model=self.model_name,
+                temperature=0.0,
+            )
+            final_answer = grounded_completion.choices[0].message.content or draft_answer
+        except Exception:
+            final_answer = draft_answer
+
         return {
-            "answer": chat_completion.choices[0].message.content,
+            "answer": final_answer,
             "resources": resources
         }
 
@@ -498,7 +555,7 @@ class MentalHealthRAG:
         chat_completion = self.client.chat.completions.create(
             messages=formatted_messages,
             model=self.model_name,
-            temperature=0.7
+            temperature=0.2
         )
 
         return chat_completion.choices[0].message.content

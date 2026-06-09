@@ -37,6 +37,7 @@ dependencies = [
     "transformers>=5.9.0",
     "coverage>=7.14.1",
     "langsmith>=0.8.9",
+    "dspy>=3.2.1",
 ]
 
 [build-system]

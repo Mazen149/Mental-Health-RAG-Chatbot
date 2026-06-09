@@ -14,21 +14,10 @@ LANGUAGE_NAMES = {
     "tr": "Turkish",   "ur": "Urdu",      "vi": "Vietnamese", "zh": "Chinese",
 }
 
-# Locate project root
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parents[2]
-
-_DEFAULT_MODEL_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "language_detection_best_model.pkl"
-_DEFAULT_VECTORIZER_PATH = _PROJECT_ROOT / "artifacts" / "langauge_detection" / "language_detection_best_vectorizer.pkl"
+from ..config import config
 
 
-MAX_LEN = 300
+MAX_LEN = config.LANGUAGE_DETECTION_MAX_LEN
 
 
 def preprocess(text: str) -> str:
@@ -65,11 +54,11 @@ class LanguageDetector:
 
     def __init__(
         self,
-        model_path: str | Path = _DEFAULT_MODEL_PATH,
-        vectorizer_path: str | Path = _DEFAULT_VECTORIZER_PATH,
+        model_path: str | Path | None = None,
+        vectorizer_path: str | Path | None = None,
     ):
-        self.model_path = Path(model_path)
-        self.vectorizer_path = Path(vectorizer_path)
+        self.model_path = Path(model_path) if model_path else config.MOD1_CLASSIFIER_PATH
+        self.vectorizer_path = Path(vectorizer_path) if vectorizer_path else config.MOD1_VECTORIZER_PATH
 
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model file not found: {self.model_path}")

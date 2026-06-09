@@ -39,23 +39,7 @@ except ImportError:
             pass
 
 # Locate project root and load environment
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parents[2]
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
-
-_DEFAULT_QDRANT_PATH = str(_PROJECT_ROOT / "qdrant_db")
-_DEFAULT_CACHE_PATH = str(_PROJECT_ROOT / "artifacts" / "processed_docs.pkl")
+from ..config import config
 
 CRISIS_KEYWORDS = [
     # English
@@ -162,118 +146,12 @@ def check_medical_advice(answer: str, language: str) -> str:
 
 
 
-class RetrievalRouterSignature(dspy.Signature):
-    """Classify if the user's latest query refers to previous chat history (e.g., asking about what they said, their name, their personal details, or what was discussed) and can be answered using only the chat history, or if it asks a new mental health/counseling question that requires retrieving external medical/support document resources."""
-    
-    chat_history = dspy.InputField(desc="Pruned recent chat turns between user and assistant")
-    user_query = dspy.InputField(desc="The user's latest query")
-    
-    route = dspy.OutputField(desc="exactly 'history_only' or 'requires_retrieval'")
-
-
-class RetrievalRouterModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.route_predict = dspy.Predict(RetrievalRouterSignature)
-
-    def forward(self, chat_history: str, user_query: str) -> str:
-        res = self.route_predict(chat_history=chat_history, user_query=user_query)
-        route_val = str(res.route).strip().lower()
-        if "history_only" in route_val:
-            return "history_only"
-        return "requires_retrieval"
-
-
-class QueryCondenserSignature(dspy.Signature):
-    """Given a chat history and the latest user question which might reference context in the chat history,
-    formulate a standalone question which can be understood without the chat history.
-    The standalone question MUST be written in English. Do NOT answer the question, just reformulate it
-    and output ONLY the standalone question."""
-    
-    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
-    user_query = dspy.InputField(desc="The latest user question/query")
-    condensed_query = dspy.OutputField(desc="A standalone question in English representing the query in history context")
-
-
-class QueryCondenserModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.condense = dspy.Predict(QueryCondenserSignature)
-
-    def forward(self, chat_history: str, user_query: str) -> str:
-        res = self.condense(chat_history=chat_history, user_query=user_query)
-        return str(res.condensed_query).strip()
-
-
-class GroundedResponseSignature(dspy.Signature):
-    """You are a compassionate, professional mental health support assistant.
-    Your goal is to provide a supportive, empathetic, and conversational response to the user's query.
-    
-    CRITICAL GROUNDING RULES:
-    - Ground your response and advice in the retrieved contexts. You should also refer to personal facts, context, or situations mentioned in the chat history.
-    - If neither the retrieved contexts nor the chat history contain enough information to address the query, respond exactly with: 'I'm sorry, I don't have enough information to answer that.' (or its translation in the user's language).
-    - Strictly avoid inventing therapy techniques, clinical diagnoses, or medication names. Do not hallucinate.
-    
-    CRITICAL LANGUAGE RULES:
-    - Respond in the language that the query is ACTUALLY written in.
-    - If the contexts are in a different language, translate the relevant information from those contexts into the user's language.
-    
-    RESPONSE FORMAT:
-    - Keep your response concise, to exactly 3-5 sentences.
-    - Do not use bullet points or numbered lists.
-    - Cite the retrieved contexts by appending the context number in square brackets, e.g. [1], [2], or [3] (corresponding to Context [1], Context [2], or Context [3]). Do not create other citations.
-    - Adjust tone implicitly according to the user's emotions and directives. Do not label their emotions explicitly.
-    """
-
-    contexts = dspy.InputField(desc="Retrieved counseling case contexts, formatted as Context [1], Context [2], Context [3]")
-    emotions = dspy.InputField(desc="User's detected emotional state and tone directives")
-    language = dspy.InputField(desc="Detected language and translation/actual query language instructions")
-    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
-    user_query = dspy.InputField(desc="The user's query/message")
-    
-    answer = dspy.OutputField(desc="Empathetic, grounded response matching language/tone directives and citations")
-
-
-class GroundedResponseModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.generate = dspy.ChainOfThought(GroundedResponseSignature)
-
-    def forward(self, contexts: str, emotions: str, language: str, chat_history: str, user_query: str) -> str:
-        res = self.generate(
-            contexts=contexts,
-            emotions=emotions,
-            language=language,
-            chat_history=chat_history,
-            user_query=user_query
-        )
-        return str(res.answer).strip()
-
-
-class GeneralConversationSignature(dspy.Signature):
-    """You are Serene AI, a compassionate, friendly, and professional mental health support assistant.
-    The user is engaging in greeting, goodbye, gratitude, or basic small talk/introductions.
-    Respond warmly, naturally, and in a friendly conversational manner in the user's language.
-    If the user has introduced themselves or mentioned their name in the history or query, acknowledge and remember it.
-    If they ask for their name, tell them their name if it was mentioned.
-    Keep your response concise, to exactly 1-3 sentences. Do not offer clinical advice here; just be warm, welcoming, and supportive.
-    """
-    
-    language = dspy.InputField(desc="The user's language")
-    chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
-    user_query = dspy.InputField(desc="The user's query/greeting")
-    
-    answer = dspy.OutputField(desc="Warm, friendly conversational response in the user's language (1-3 sentences)")
-
-
-class GeneralConversationModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.respond = dspy.Predict(GeneralConversationSignature)
-
-    def forward(self, language: str, chat_history: str, user_query: str) -> str:
-        res = self.respond(language=language, chat_history=chat_history, user_query=user_query)
-        return str(res.answer).strip()
+from .prompts import (
+    RetrievalRouterModule,
+    QueryCondenserModule,
+    GroundedResponseModule,
+    GeneralConversationModule
+)
 
 
 class MentalHealthRAG:
@@ -282,21 +160,21 @@ class MentalHealthRAG:
     Hugging Face batch CrossEncoder reranking.
     """
 
-    def __init__(self, qdrant_path: str = _DEFAULT_QDRANT_PATH, cache_path: str = _DEFAULT_CACHE_PATH):
+    def __init__(self, qdrant_path: str | None = None, cache_path: str | None = None):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.qdrant_path = qdrant_path
-        self.cache_path = cache_path
-        self.collection_name = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")
+        self.qdrant_path = qdrant_path if qdrant_path else str(config.QDRANT_LOCAL_PATH)
+        self.cache_path = cache_path if cache_path else str(config.CACHE_PATH)
+        self.collection_name = config.QDRANT_COLLECTION_NAME
 
-        self.embeddings = HuggingFaceEmbeddings(model_name=os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5"))
+        self.embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
         self.rerank_client = InferenceClient(
             provider="hf-inference",
-            api_key=os.getenv("HF_TOKEN"),
+            api_key=config.HF_TOKEN,
             timeout=2.0,
         )
         # For testing compatibility:
         if "Mock" in type(CrossEncoder).__name__ or "MagicMock" in type(CrossEncoder).__name__:
-            self.rerank_model = CrossEncoder(os.getenv("RERANKER_MODEL", "BAAI/bge-reranker-v2-m3"))
+            self.rerank_model = CrossEncoder(config.RERANKER_MODEL)
         else:
             self.rerank_model = None
 
@@ -305,12 +183,12 @@ class MentalHealthRAG:
         self.qdrant_client = None
         
         # Generation model and chunk settings
-        self.model_name = os.getenv("GROQ_GENERATION_MODEL", "openai/gpt-oss-20b")
+        self.model_name = config.GROQ_GENERATION_MODEL
         self.chunk_size = 500
         self.chunk_overlap = 100
 
         # Initialize DSPy modules
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_api_key = config.GROQ_API_KEY
         if groq_api_key:
             self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
             self.condense_module = QueryCondenserModule()
@@ -416,8 +294,8 @@ class MentalHealthRAG:
 
     def setup_retriever(self, documents: List[Document]) -> None:
         """Sets up the hybrid Qdrant + BM25 ensemble retriever."""
-        qdrant_url = os.getenv("QDRANT_URL")
-        qdrant_api_key = os.getenv("QDRANT_API_KEY")
+        qdrant_url = config.QDRANT_URL
+        qdrant_api_key = config.QDRANT_API_KEY
 
         if qdrant_url:
             print(f"--> [RAG Setup] Connecting to Qdrant Cloud at: {qdrant_url}")

@@ -12,20 +12,7 @@ import numpy as np
 from pydantic import BaseModel, Field
 
 # Locate project root and load environment
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parents[2]
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
+from ..config import config
 
 
 class Intent(BaseModel):
@@ -43,53 +30,7 @@ class Intent(BaseModel):
     )
 
 
-class IntentClassifierSignature(dspy.Signature):
-    """You are a strict intent classification engine for a mental-health support assistant.
-    Classify the user's message into exactly one label: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis.
-    
-    Guidelines:
-    - greeting: for greeting, introduction, small talk (e.g. sharing or asking about names, how are you).
-    - goodbye: for farewell and parting words.
-    - gratitude: for expressions of thanks or appreciation.
-    - out_of_scope: for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).
-    - asking_mental_health_question: for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.
-    - crisis: for any query indicating suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.
-    """
-
-    text = dspy.InputField(desc="The user message to classify")
-    type = dspy.OutputField(desc="exactly one of: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis")
-    confidence = dspy.OutputField(desc="confidence score of the intent classification, between 0.0 and 1.0")
-
-
-class IntentClassifierModule(dspy.Module):
-    def __init__(self):
-        super().__init__()
-        self.classify = dspy.Predict(IntentClassifierSignature)
-
-    def forward(self, text: str) -> dict:
-        pred = self.classify(text=text)
-        
-        pred_type = str(pred.type).strip().strip('"').strip("'").lower()
-        valid_types = {
-            "greeting", "goodbye", "gratitude", 
-            "out_of_scope", "asking_mental_health_question", "crisis"
-        }
-        if pred_type not in valid_types:
-            pred_type = "greeting"
-            
-        try:
-            conf_str = "".join(c for c in str(pred.confidence) if c.isdigit() or c == '.')
-            pred_conf = float(conf_str)
-        except (ValueError, TypeError):
-            pred_conf = 0.65
-            
-        pred_conf = max(0.0, min(1.0, pred_conf))
-        
-        return {
-            "type": pred_type,
-            "confidence": pred_conf,
-            "classifier": "llm"
-        }
+from .prompts import IntentClassifierModule
 
 
 class IntentClassifier:
@@ -98,10 +39,10 @@ class IntentClassifier:
     def __init__(self, llm_fallback: Callable[[str], Intent] | None = None):
         self.llm_fallback = llm_fallback or self._llm_fallback
 
-        self.model_name = os.getenv("GROQ_CLASSIFIER_MODEL", "openai/gpt-oss-20b")
+        self.model_name = config.GROQ_CLASSIFIER_MODEL
 
         # Initialize DSPy LM if API key is available
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        groq_api_key = config.GROQ_API_KEY
         if groq_api_key:
             self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
             self.fallback_module = IntentClassifierModule()
@@ -155,7 +96,7 @@ class IntentClassifier:
         self.embedding_threshold = 0.65
         self.embedding_model = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         
-        hf_token = os.environ.get("HF_TOKEN")
+        hf_token = config.HF_TOKEN
         self.embedding_client = InferenceClient(
             provider="hf-inference",
             api_key=hf_token,

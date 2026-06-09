@@ -741,7 +741,6 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
             "language": result.get("language"),
             "emotion": result.get("emotion"),
             "intent": result.get("intent"),
-            "resources": resources,
         })
         yield _sse_event("start", {"status": "streaming"})
 
@@ -749,6 +748,7 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
             yield _sse_event("chunk", {"text": chunk})
             await asyncio.sleep(0.02)
 
+        yield _sse_event("citations", {"resources": resources})
         yield _sse_event("done", {"status": "done"})
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

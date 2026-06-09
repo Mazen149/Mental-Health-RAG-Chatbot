@@ -638,7 +638,6 @@
           meta: (data) => {
             try {
               streamedMetadata = JSON.parse(data);
-              resources = Array.isArray(streamedMetadata.resources) ? streamedMetadata.resources : [];
             } catch (error) {
               console.error('Failed to parse stream metadata:', error);
             }
@@ -655,6 +654,14 @@
               chatWindow.scrollTop = chatWindow.scrollHeight;
             } catch (error) {
               console.error('Failed to parse stream chunk:', error);
+            }
+          },
+          citations: (data) => {
+            try {
+              const payload = JSON.parse(data);
+              resources = Array.isArray(payload.resources) ? payload.resources : [];
+            } catch (error) {
+              console.error('Failed to parse stream citations:', error);
             }
           },
           done: () => {}

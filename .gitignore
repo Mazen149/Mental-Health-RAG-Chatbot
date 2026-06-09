@@ -2,6 +2,13 @@
 __pycache__/
 *.py[codz]
 *$py.class
+.dist/
+.uv-cache/
+.vscode/
+qdrant_db/
+mlruns/
+.deepeval/
+.3T_community/
 
 # C extensions
 *.so

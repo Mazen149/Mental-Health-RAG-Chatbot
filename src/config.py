@@ -21,9 +21,10 @@ class Config:
 
     ENV_PATH = PROJECT_ROOT / ".env"
     if ENV_PATH.exists():
-        load_dotenv(dotenv_path=ENV_PATH)
+        load_dotenv(dotenv_path=ENV_PATH, override=True)
     else:
-        load_dotenv()
+        load_dotenv(override=True)
+
 
     # ------------------------------------------------------------------------------
     # 2. Derived File & Directory Paths (Cross-Platform)

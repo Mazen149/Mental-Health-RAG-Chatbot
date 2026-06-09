@@ -14,7 +14,7 @@ import sys
 from typing import List
 
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -281,3 +281,30 @@ async def chat(request: ChatRequest) -> ChatResponse:
         emotion=result.get("emotion"),
         intent=result.get("intent"),
     )
+
+
+@app.post("/transcribe")
+async def transcribe(file: UploadFile = File(...)) -> dict:
+    """
+    Transcribes speech input using Groq's Whisper model (whisper-large-v3).
+    """
+    if not config.GROQ_API_KEY:
+        raise HTTPException(status_code=503, detail="Groq API key is not configured.")
+
+    try:
+        from groq import Groq
+        # Initialize Groq client
+        client = Groq(api_key=config.GROQ_API_KEY)
+        
+        file_bytes = await file.read()
+        filename = file.filename or "recording.wav"
+        
+        # Call Groq's speech-to-text API
+        transcription = client.audio.transcriptions.create(
+            file=(filename, file_bytes),
+            model="whisper-large-v3",
+        )
+        return {"text": transcription.text}
+    except Exception as e:
+        print(f"--> [Speech-to-Text Error] Audio transcription failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")

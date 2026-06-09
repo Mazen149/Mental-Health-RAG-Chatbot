@@ -67,6 +67,14 @@
       <form id="chat-form" class="chat-form">
         <div class="input-wrapper">
           <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
+          <button type="button" id="mic-btn" class="mic-btn" title="Record Voice">
+            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+          </button>
           <button type="submit" id="send-btn" title="Send Message">
             <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round" stroke-linejoin="round">
@@ -429,6 +437,94 @@
         thinkingBubble.remove();
         chatHistory.pop(); // Remove failed user message from history
         addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
+      }
+    });
+
+    // Speech Input recording logic
+    const micBtn = document.getElementById('mic-btn');
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    micBtn.addEventListener('click', async () => {
+      if (!isRecording) {
+        // Start recording
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Voice recording is not supported in this browser.');
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = async () => {
+            // Stop all tracks to release microphone
+            stream.getTracks().forEach(track => track.stop());
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            
+            // Set input placeholder to transcribing
+            const originalPlaceholder = queryInput.placeholder;
+            queryInput.placeholder = 'Transcribing voice...';
+            queryInput.disabled = true;
+            micBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'recording.wav');
+
+            try {
+              const response = await fetch('/transcribe', {
+                method: 'POST',
+                body: formData,
+              });
+
+              if (!response.ok) {
+                throw new Error('Transcription failed');
+              }
+
+              const data = await response.json();
+              if (data.text) {
+                queryInput.value = data.text;
+                // Auto grow textarea
+                queryInput.style.height = 'auto';
+                queryInput.style.height = (queryInput.scrollHeight) + 'px';
+              }
+            } catch (err) {
+              console.error('Transcription error:', err);
+              alert('Could not transcribe audio. Please try again.');
+            } finally {
+              queryInput.placeholder = originalPlaceholder;
+              queryInput.disabled = false;
+              micBtn.disabled = false;
+              queryInput.focus();
+            }
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.classList.add('recording');
+          micBtn.title = 'Stop Recording';
+          queryInput.placeholder = 'Listening... Speak clearly. Click mic again to stop.';
+        } catch (err) {
+          console.error('Error starting audio recording:', err);
+          alert('Could not access microphone. Please check permissions.');
+        }
+      } else {
+        // Stop recording
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+        isRecording = false;
+        micBtn.classList.remove('recording');
+        micBtn.title = 'Record Voice';
       }
     });
   </script>

@@ -50,7 +50,9 @@ _translator_pipeline = None
 
 def translate_to_english(text: str, client=None) -> str:
     """
-    Translates non-English text to English using a local Helsinki-NLP translation transformer.
+    Translates non-English text to English.
+    Uses Groq LLM model (openai/gpt-oss-20b) if a client is provided.
+    Falls back to the local Helsinki-NLP translation model if Groq is not available or fails.
     Safely bypasses translation for pure ASCII inputs.
     """
     global _translator_pipeline
@@ -59,6 +61,34 @@ def translate_to_english(text: str, client=None) -> str:
         if all(ord(c) < 128 for c in text):
             return text
 
+        # Attempt to translate using Groq LLM client if passed
+        if client is not None:
+            try:
+                sys_prompt = (
+                    "You are a highly accurate translation assistant. "
+                    "Translate the user's input text to English. "
+                    "Provide only the direct English translation without any introductory or concluding text, explanations, quotes, or markdown formatting."
+                )
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": sys_prompt},
+                        {"role": "user", "content": text}
+                    ],
+                    model="openai/gpt-oss-20b",
+                    temperature=0.0,
+                )
+                translated = chat_completion.choices[0].message.content.strip()
+                if translated.startswith('"') and translated.endswith('"'):
+                    translated = translated[1:-1].strip()
+                elif translated.startswith("'") and translated.endswith("'"):
+                    translated = translated[1:-1].strip()
+                if translated:
+                    safe_print(f"--> [Translator] Successfully translated query using Groq LLM: '{translated}'")
+                    return translated
+            except Exception as llm_err:
+                safe_print(f"--> [Translator Warning] Groq LLM translation failed, falling back to local: {llm_err}")
+
+        # Fallback to local model
         if _translator_pipeline is None:
             from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
             safe_print("--> [Translator Setup] Initializing local multilingual translation model...")
@@ -74,6 +104,7 @@ def translate_to_english(text: str, client=None) -> str:
     except Exception as e:
         safe_print(f"--> [Translator Error] Local translation failed: {e}")
         return text
+
 
 
 def get_direct_greeting(language: str) -> str:
@@ -242,8 +273,9 @@ async def route_query(query: str, rag_instance, history: list = None) -> dict:
     query_en = query
     if ENABLE_TRANSLATION and language != "English":
         safe_print(f"--> [Router] Translating query from {language} to English...")
-        query_en = translate_to_english(query)
+        query_en = translate_to_english(query, client=rag_instance.client)
         safe_print(f"--> [Router] Translated query: '{query_en}'")
+
 
     # =============================================
     # ROUTING LOGIC

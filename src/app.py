@@ -8,16 +8,18 @@ asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
 """
 
 import importlib
+import asyncio
 import os
 from pathlib import Path
 import sys
 from typing import List
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import Cookie, FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from langsmith import traceable
 from pydantic import BaseModel, Field
 
 # ------------------------------------------------------------------------------
@@ -41,6 +43,15 @@ else:
 # Local project imports (must load after environment resolution)
 from .modules.rag import MentalHealthRAG
 from .router import route_query
+from .storage import (
+    authenticate_user,
+    create_session,
+    create_user,
+    get_user_by_session,
+    initialize_database,
+    record_interaction,
+    revoke_session,
+)
 
 # ------------------------------------------------------------------------------
 # 2. Pydantic API Schemas
@@ -65,6 +76,11 @@ class ChatRequest(BaseModel):
         None,
         description="The recent chat history turns for conversational context."
     )
+
+
+class AuthRequest(BaseModel):
+    username: str = Field(..., description="The user's login name.")
+    password: str = Field(..., description="The user's password.")
 
 
 class Resource(BaseModel):
@@ -103,6 +119,11 @@ class ChatResponse(BaseModel):
         None, 
         description="The classified conversational or clinical intent of the query."
     )
+
+
+class AuthResponse(BaseModel):
+    username: str = Field(..., description="The authenticated username.")
+    message: str = Field(..., description="A short human-readable status message.")
 
 
 # ------------------------------------------------------------------------------
@@ -227,14 +248,32 @@ app.mount(
 rag: MentalHealthRAG | None = None
 
 
+SESSION_COOKIE_NAME = "serene_session"
+SESSION_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
+
+
+def _build_auth_response(payload: dict, token: str) -> JSONResponse:
+    response = JSONResponse(payload)
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=SESSION_COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax",
+        secure=False,
+        path="/",
+    )
+    return response
+
+
 # ------------------------------------------------------------------------------
 # 5. Lifespan Event Listeners
 # ------------------------------------------------------------------------------
 @app.on_event("startup")
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
+    await asyncio.to_thread(initialize_database)
     validate_environment()
-    import asyncio
     
     async def load_rag():
         global rag
@@ -275,8 +314,61 @@ async def health_check() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/auth/me")
+async def current_user(session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME)) -> dict:
+    user = get_user_by_session(session_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    return {"username": user["username"], "created_at": user["created_at"]}
+
+
+@app.post("/auth/register", response_model=AuthResponse)
+async def register_user(payload: AuthRequest) -> JSONResponse:
+    try:
+        user = create_user(payload.username, payload.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    session = create_session(user["id"])
+    return _build_auth_response(
+        {
+            "username": user["username"],
+            "message": "Account created and signed in successfully.",
+        },
+        session["token"],
+    )
+
+
+@app.post("/auth/login", response_model=AuthResponse)
+async def login_user(payload: AuthRequest) -> JSONResponse:
+    user = authenticate_user(payload.username, payload.password)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid username or password.")
+
+    session = create_session(user["id"])
+    return _build_auth_response(
+        {
+            "username": user["username"],
+            "message": "Signed in successfully.",
+        },
+        session["token"],
+    )
+
+
+@app.post("/auth/logout")
+async def logout_user(session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME)) -> JSONResponse:
+    revoke_session(session_id)
+    response = JSONResponse({"message": "Signed out successfully."})
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/")
+    return response
+
+
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+@traceable(name="serene.chat_endpoint", run_type="chain")
+async def chat(
+    request: ChatRequest,
+    session_id: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query text is required.")
@@ -284,9 +376,23 @@ async def chat(request: ChatRequest) -> ChatResponse:
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
 
+    user = get_user_by_session(session_id)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Please sign in before using the RAG system.")
+
     result = await route_query(request.query, rag, history=request.history)
     if not result or "answer" not in result:
         raise HTTPException(status_code=500, detail="Failed to generate a response.")
+
+    record_interaction(
+        user["id"],
+        query=request.query,
+        answer=result["answer"],
+        language=result.get("language"),
+        emotion=result.get("emotion"),
+        intent=result.get("intent"),
+        history=[message.model_dump() for message in request.history] if request.history else None,
+    )
 
     return ChatResponse(
         answer=result["answer"],

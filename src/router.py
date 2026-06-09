@@ -60,16 +60,16 @@ def translate_to_english(text: str, client=None) -> str:
             return text
 
         if _translator_pipeline is None:
-            from transformers import pipeline
-            safe_print("--> [Translator Setup] Initializing local multilingual translation pipeline...")
-            _translator_pipeline = pipeline(
-                "translation",
-                model="Helsinki-NLP/opus-mt-mul-en",
-                device=-1  # Force CPU execution
-            )
+            from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+            safe_print("--> [Translator Setup] Initializing local multilingual translation model...")
+            tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-mul-en")
+            model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-mul-en")
+            _translator_pipeline = (tokenizer, model)
         
-        result = _translator_pipeline(text)
-        translated = result[0]['translation_text'].strip()
+        tokenizer, model = _translator_pipeline
+        inputs = tokenizer(text, return_tensors="pt")
+        outputs = model.generate(**inputs)
+        translated = tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
         return translated if translated else text
     except Exception as e:
         safe_print(f"--> [Translator Error] Local translation failed: {e}")

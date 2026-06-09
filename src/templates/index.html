@@ -5,35 +5,128 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Serene AI - Empathetic Mental Health Support</title>
-  <!-- Premium Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 
-<body>
+<body class="{% if mode in ['login', 'register'] %}login-mode{% else %}chat-mode{% endif %}">
+  {% if mode == 'login' %}
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <div class="auth-brand">
+        <div class="auth-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <p class="eyebrow">Secure access</p>
+        <h1>Serene AI</h1>
+        <p class="auth-copy">Sign in to continue to the full-screen mental health support workspace.</p>
+      </div>
+
+      <form class="auth-form" method="post" action="/login">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" placeholder="Choose a username" autocomplete="username" required>
+        </label>
+
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Choose a password" autocomplete="current-password" required>
+        </label>
+
+        {% if error %}
+        <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <button type="submit" class="auth-submit">Sign in</button>
+      </form>
+
+      <div class="auth-note">
+        New here? <a href="/register">Create an account</a> to get started.
+        {% if success %}
+        <div class="auth-success">Account created successfully. Please sign in.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+  {% elif mode == 'register' %}
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <div class="auth-brand">
+        <div class="auth-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <p class="eyebrow">Create account</p>
+        <h1>Serene AI</h1>
+        <p class="auth-copy">Create your account first, then sign in to access your workspace.</p>
+      </div>
+
+      <form class="auth-form" method="post" action="/register">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" placeholder="Choose a username" autocomplete="username" required>
+        </label>
+
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Choose a password" autocomplete="new-password" required>
+        </label>
+
+        <label>
+          <span>Confirm password</span>
+          <input type="password" name="confirm_password" placeholder="Repeat your password" autocomplete="new-password" required>
+        </label>
+
+        {% if error %}
+        <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <button type="submit" class="auth-submit">Create account</button>
+      </form>
+
+      <div class="auth-note">
+        Already have an account? <a href="/login">Go to login</a>.
+      </div>
+    </section>
+  </main>
+  {% else %}
   <div class="app-shell">
-    <!-- Top Decorative Blur Elements -->
     <div class="blur-glow glow-1"></div>
     <div class="blur-glow glow-2"></div>
 
     <header class="hero-header">
-      <div class="header-icon-wrap">
-        <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-          <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-          <line x1="12" y1="19" x2="12" y2="22" />
-        </svg>
+      <div class="hero-copy">
+        <div class="header-icon-wrap">
+          <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">Welcome back{% if username %}, {{ username }}{% endif %}</p>
+          <h1>Serene AI</h1>
+          <p>A full-screen, grounded support workspace for compassionate mental health conversations.</p>
+        </div>
       </div>
-      <h1>Serene AI</h1>
-      <p>A safe, compassionate space for mental health support, grounded in professional counseling resources.</p>
+
+      <form method="post" action="/logout" class="logout-form">
+        <button type="submit" class="logout-btn">Logout</button>
+      </form>
     </header>
 
     <main class="chat-container">
-      <!-- Chat Area Header -->
       <div class="chat-header">
         <div class="status-indicator">
           <span class="status-dot pulsing"></span>
@@ -53,7 +146,6 @@
         </div>
       </div>
 
-      <!-- Chat Window -->
       <section class="chat-window" id="chat-window">
         <div class="bubble assistant system-intro">
           <h3>Welcome to Serene AI</h3>
@@ -63,7 +155,6 @@
         </div>
       </section>
 
-      <!-- Chat Input Form -->
       <form id="chat-form" class="chat-form">
         <div class="input-wrapper">
           <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
@@ -75,7 +166,7 @@
               <line x1="12" y1="19" x2="12" y2="22"></line>
             </svg>
           </button>
-          <button type="submit" id="send-btn" title="Send Message">
+          <button type="submit" id="send-btn" class="send-btn" title="Send Message">
             <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
               stroke-linecap="round" stroke-linejoin="round">
               <line x1="22" y1="2" x2="11" y2="13"></line>
@@ -92,7 +183,6 @@
     </footer>
   </div>
 
-  <!-- Formatting & Security Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js"
     integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw=="
@@ -105,7 +195,6 @@
     const clearBtn = document.getElementById('clear-btn');
     const chatHistory = [];
 
-    // Clear Chat history
     clearBtn.addEventListener('click', () => {
       chatHistory.length = 0;
       const welcomeMessage = chatWindow.querySelector('.system-intro');
@@ -123,13 +212,11 @@
       }
     });
 
-    // Auto-grow textarea height
     queryInput.addEventListener('input', function () {
       this.style.height = 'auto';
       this.style.height = (this.scrollHeight) + 'px';
     });
 
-    // Enter key submits (Shift+Enter inserts new line)
     queryInput.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
@@ -152,6 +239,38 @@
       return markdown || '';
     };
 
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch('/chat/history');
+        if (!response.ok) return;
+
+        const history = await response.json();
+        if (!Array.isArray(history) || history.length === 0) return;
+
+        chatWindow.innerHTML = '';
+        chatHistory.length = 0;
+
+        history.forEach((message) => {
+          if (message.role === 'user') {
+            addBubble(message.content, 'user');
+            chatHistory.push({ role: 'user', content: message.content });
+          } else if (message.role === 'assistant') {
+            const bubbleWrapper = addBubble(message.content, 'assistant', {
+              language: message.language,
+              emotion: message.emotion,
+              intent: message.intent
+            });
+            if (Array.isArray(message.resources) && message.resources.length > 0) {
+              addCitations(message.resources, bubbleWrapper);
+            }
+            chatHistory.push({ role: 'assistant', content: message.content });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    };
+
     const safeSanitize = (text) => {
       try {
         if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
@@ -163,7 +282,6 @@
       return text || '';
     };
 
-    // Emotion mappings to beautiful emojis and custom CSS classes
     const EMOTION_MAP = {
       "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
       "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
@@ -177,7 +295,6 @@
       const wrapper = document.createElement('div');
       wrapper.className = `bubble-wrapper ${role}-wrapper`;
 
-      // Create Avatar element
       const avatar = document.createElement('div');
       avatar.className = `avatar ${role}-avatar`;
       if (role === 'assistant') {
@@ -197,7 +314,6 @@
           `;
       }
 
-      // Create bubble content wrapper (holds bubble + pills + citations)
       const contentArea = document.createElement('div');
       contentArea.className = 'bubble-content-area';
 
@@ -214,7 +330,6 @@
               </div>
             `;
         } else {
-          // Replace [1], [2], [3] citations with pretty interactive inline-citation badges
           let formattedText = text || '';
           formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
             return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
@@ -227,12 +342,10 @@
 
       contentArea.appendChild(bubble);
 
-      // Add Metadata pills if present (for assistant only)
       if (role === 'assistant' && metadata && text !== 'Thinking...') {
         const metaContainer = document.createElement('div');
         metaContainer.className = 'meta-pills';
 
-        // 1. Language pill
         if (metadata.language) {
           const langPill = document.createElement('span');
           langPill.className = 'meta-pill language-pill';
@@ -240,7 +353,6 @@
           metaContainer.appendChild(langPill);
         }
 
-        // 2. Emotion pills
         if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
           metadata.emotion.forEach(emo => {
             const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
@@ -251,7 +363,6 @@
           });
         }
 
-        // 3. Intent pill
         if (metadata.intent) {
           const intentPill = document.createElement('span');
           intentPill.className = 'meta-pill intent-pill';
@@ -264,7 +375,6 @@
         contentArea.appendChild(metaContainer);
       }
 
-      // Arrange elements in bubble wrapper depending on role
       if (role === 'assistant') {
         wrapper.appendChild(avatar);
         wrapper.appendChild(contentArea);
@@ -287,7 +397,6 @@
       const citationWrapper = document.createElement('div');
       citationWrapper.className = 'citation-wrapper';
 
-      // Expandable Title Header
       const header = document.createElement('div');
       header.className = 'citation-header';
       header.innerHTML = `
@@ -352,7 +461,6 @@
         body.appendChild(item);
       });
 
-      // Toggle Expand/Collapse
       header.addEventListener('click', () => {
         body.classList.toggle('collapsed');
         header.classList.toggle('expanded');
@@ -380,7 +488,7 @@
           const targetItem = items[index - 1];
           targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           targetItem.classList.remove('highlight-pulse');
-          void targetItem.offsetWidth; // Force reflow
+          void targetItem.offsetWidth;
           targetItem.classList.add('highlight-pulse');
         }
       }
@@ -391,18 +499,12 @@
       const query = queryInput.value.trim();
       if (!query) return;
 
-      // Reset input area
       queryInput.value = '';
       queryInput.style.height = 'auto';
 
-      // Add user bubble and thinking state
       addBubble(query, 'user');
       const thinkingBubble = addBubble('Thinking...', 'assistant');
-
-      // Slice history to send optimized rolling window
       const historyToSend = chatHistory.slice(-6);
-
-      // Add user query to history
       chatHistory.push({ role: 'user', content: query });
 
       try {
@@ -413,34 +515,27 @@
         });
 
         const data = await response.json();
-
-        // Remove the thinking state bubble
         thinkingBubble.remove();
 
         if (response.ok && data.answer) {
-          // Add assistant bubble with full metadata pills
           const bubbleWrapper = addBubble(data.answer, 'assistant', {
             language: data.language,
             emotion: data.emotion,
             intent: data.intent
           });
-          // Add expandable resources below response inside the bubble wrapper
           addCitations(data.resources, bubbleWrapper);
-
-          // Add assistant response to history
           chatHistory.push({ role: 'assistant', content: data.answer });
         } else {
-          chatHistory.pop(); // Remove failed user message from history
+          chatHistory.pop();
           addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
         }
       } catch (error) {
         thinkingBubble.remove();
-        chatHistory.pop(); // Remove failed user message from history
+        chatHistory.pop();
         addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
       }
     });
 
-    // Speech Input recording logic
     const micBtn = document.getElementById('mic-btn');
     let mediaRecorder = null;
     let audioChunks = [];
@@ -448,7 +543,6 @@
 
     micBtn.addEventListener('click', async () => {
       if (!isRecording) {
-        // Start recording
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           alert('Voice recording is not supported in this browser.');
           return;
@@ -466,12 +560,9 @@
           };
 
           mediaRecorder.onstop = async () => {
-            // Stop all tracks to release microphone
             stream.getTracks().forEach(track => track.stop());
 
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-            
-            // Set input placeholder to transcribing
             const originalPlaceholder = queryInput.placeholder;
             queryInput.placeholder = 'Transcribing voice...';
             queryInput.disabled = true;
@@ -493,7 +584,6 @@
               const data = await response.json();
               if (data.text) {
                 queryInput.value = data.text;
-                // Auto grow textarea
                 queryInput.style.height = 'auto';
                 queryInput.style.height = (queryInput.scrollHeight) + 'px';
               }
@@ -518,7 +608,6 @@
           alert('Could not access microphone. Please check permissions.');
         }
       } else {
-        // Stop recording
         if (mediaRecorder && mediaRecorder.state !== 'inactive') {
           mediaRecorder.stop();
         }
@@ -527,7 +616,10 @@
         micBtn.title = 'Record Voice';
       }
     });
+
+    loadChatHistory();
   </script>
+  {% endif %}
 </body>
 
 </html>

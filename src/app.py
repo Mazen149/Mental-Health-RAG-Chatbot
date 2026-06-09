@@ -8,17 +8,22 @@ asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
 """
 
 import importlib
+import json
+import hashlib
 import os
+import hmac
+import sqlite3
 from pathlib import Path
 import sys
-from typing import List
+from typing import Any, List
 
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from starlette.middleware.sessions import SessionMiddleware
 
 # ------------------------------------------------------------------------------
 # 1. Environment Loading & Configuration
@@ -52,6 +57,15 @@ class ChatRequest(BaseModel):
         None,
         description="The recent chat history turns for conversational context."
     )
+
+
+class HistoryItem(BaseModel):
+    role: str
+    content: str
+    language: str | None = None
+    emotion: List[str] | None = None
+    intent: str | None = None
+    resources: list | None = None
 
 
 class Resource(BaseModel):
@@ -201,6 +215,13 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET_KEY,
+    same_site="lax",
+    https_only=False,
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount(
@@ -211,6 +232,177 @@ app.mount(
 
 # Global RAG Instance
 rag: MentalHealthRAG | None = None
+DB_PATH = Path(config.CHAT_DATABASE_PATH)
+
+
+def _is_authenticated(request: Request) -> bool:
+    return bool(request.session.get("authenticated"))
+
+
+def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
+    salt = salt or os.urandom(16)
+    password_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
+    return salt.hex(), password_hash.hex()
+
+
+def _verify_password(password: str, salt_hex: str, expected_hash_hex: str) -> bool:
+    salt = bytes.fromhex(salt_hex)
+    _, computed_hash_hex = _hash_password(password, salt)
+    return hmac.compare_digest(computed_hash_hex, expected_hash_hex)
+
+
+def _init_chat_db() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_salt TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                last_login_at TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS chat_interactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                query TEXT NOT NULL,
+                response TEXT NOT NULL,
+                language TEXT,
+                emotion_json TEXT,
+                intent TEXT,
+                resources_json TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chat_interactions_user_id ON chat_interactions(user_id)"
+        )
+        conn.commit()
+
+
+def _db_connection() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _get_user_by_username(username: str) -> dict[str, Any] | None:
+    with _db_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT id, username, password_salt, password_hash, created_at, last_login_at
+            FROM users
+            WHERE username = ?
+            """,
+            (username,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def _create_user(username: str, password: str) -> dict[str, Any]:
+    salt_hex, password_hash_hex = _hash_password(password)
+    with _db_connection() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO users (username, password_salt, password_hash)
+            VALUES (?, ?, ?)
+            """,
+            (username, salt_hex, password_hash_hex),
+        )
+        conn.commit()
+        row = conn.execute(
+            """
+            SELECT id, username, password_salt, password_hash, created_at, last_login_at
+            FROM users
+            WHERE id = ?
+            """,
+            (cursor.lastrowid,),
+        ).fetchone()
+        return dict(row) if row else {
+            "id": cursor.lastrowid,
+            "username": username,
+            "password_salt": salt_hex,
+            "password_hash": password_hash_hex,
+        }
+
+
+def _update_last_login(user_id: int) -> None:
+    with _db_connection() as conn:
+        conn.execute(
+            "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (user_id,),
+        )
+        conn.commit()
+
+
+def _save_chat_interaction(
+    *,
+    user_id: int,
+    query: str,
+    response: str,
+    language: str | None = None,
+    emotion: list[str] | None = None,
+    intent: str | None = None,
+    resources: list | None = None,
+) -> None:
+    emotion_json = json.dumps(emotion, ensure_ascii=False) if emotion is not None else None
+    resources_json = json.dumps(resources, ensure_ascii=False) if resources is not None else None
+    with _db_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO chat_interactions (
+                user_id, query, response, language, emotion_json, intent, resources_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (user_id, query, response, language, emotion_json, intent, resources_json),
+        )
+        conn.commit()
+
+
+def _load_chat_history(user_id: int) -> list[dict[str, Any]]:
+    with _db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT query, response, language, emotion_json, intent, resources_json
+            FROM chat_interactions
+            WHERE user_id = ?
+            ORDER BY id ASC
+            """,
+            (user_id,),
+        ).fetchall()
+
+    history: list[dict[str, Any]] = []
+    for row in rows:
+        emotion = json.loads(row["emotion_json"]) if row["emotion_json"] else None
+        resources = json.loads(row["resources_json"]) if row["resources_json"] else None
+        history.append(
+            {
+                "role": "user",
+                "content": row["query"],
+                "language": row["language"],
+                "emotion": None,
+                "intent": None,
+                "resources": None,
+            }
+        )
+        history.append(
+            {
+                "role": "assistant",
+                "content": row["response"],
+                "language": row["language"],
+                "emotion": emotion,
+                "intent": row["intent"],
+                "resources": resources,
+            }
+        )
+    return history
 
 
 # ------------------------------------------------------------------------------
@@ -219,6 +411,7 @@ rag: MentalHealthRAG | None = None
 @app.on_event("startup")
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
+    _init_chat_db()
     validate_environment()
     import asyncio
     
@@ -252,7 +445,156 @@ async def shutdown_event() -> None:
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request) -> HTMLResponse:
     """Serves the main Serene AI empathetic chat window UI."""
-    return templates.TemplateResponse(request=request, name="index.html")
+    if not _is_authenticated(request):
+        return RedirectResponse(url="/login", status_code=302)
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "mode": "chat",
+            "username": request.session.get("username", "Guest"),
+        },
+    )
+
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request) -> HTMLResponse:
+    if _is_authenticated(request):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "mode": "login",
+            "error": None,
+            "success": request.query_params.get("registered") == "1",
+        },
+    )
+
+
+@app.post("/login")
+async def login(request: Request) -> HTMLResponse:
+    form = await request.form()
+    username = str(form.get("username", "")).strip()
+    password = str(form.get("password", "")).strip()
+
+    if not username or not password:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "login",
+                "error": "Please enter both a username and password.",
+                "success": False,
+            },
+            status_code=401,
+        )
+
+    user = _get_user_by_username(username)
+    if user is None:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "login",
+                "error": "No account found for that username. Please register first.",
+                "success": False,
+            },
+            status_code=401,
+        )
+    elif not _verify_password(password, user["password_salt"], user["password_hash"]):
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "login",
+                "error": "Invalid username or password.",
+                "success": False,
+            },
+            status_code=401,
+        )
+
+    request.session["authenticated"] = True
+    request.session["user_id"] = int(user["id"])
+    request.session["username"] = username
+    _update_last_login(int(user["id"]))
+    return RedirectResponse(url="/", status_code=302)
+
+
+@app.get("/register", response_class=HTMLResponse)
+async def register_page(request: Request) -> HTMLResponse:
+    if _is_authenticated(request):
+        return RedirectResponse(url="/", status_code=302)
+    return templates.TemplateResponse(
+        request=request,
+        name="index.html",
+        context={
+            "mode": "register",
+            "error": None,
+        },
+    )
+
+
+@app.post("/register")
+async def register(request: Request) -> HTMLResponse:
+    form = await request.form()
+    username = str(form.get("username", "")).strip()
+    password = str(form.get("password", "")).strip()
+    confirm_password = str(form.get("confirm_password", "")).strip()
+
+    if not username or not password or not confirm_password:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "register",
+                "error": "Please fill in every field.",
+            },
+            status_code=400,
+        )
+
+    if password != confirm_password:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "register",
+                "error": "Passwords do not match. Please try again.",
+            },
+            status_code=400,
+        )
+
+    if _get_user_by_username(username) is not None:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "register",
+                "error": "That username already exists. Please choose another one or log in.",
+            },
+            status_code=400,
+        )
+
+    try:
+        _create_user(username, password)
+    except sqlite3.IntegrityError:
+        return templates.TemplateResponse(
+            request=request,
+            name="index.html",
+            context={
+                "mode": "register",
+                "error": "Could not create your account. Please try again.",
+            },
+            status_code=500,
+        )
+
+    return RedirectResponse(url="/login?registered=1", status_code=302)
+
+
+@app.post("/logout")
+async def logout(request: Request) -> RedirectResponse:
+    request.session.clear()
+    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.get("/health")
@@ -261,18 +603,58 @@ async def health_check() -> dict:
     return {"status": "ok"}
 
 
+@app.get("/chat/history")
+async def chat_history(request: Request) -> list[dict[str, Any]]:
+    if not _is_authenticated(request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    user_id = request.session.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    return _load_chat_history(int(user_id))
+
+
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest) -> ChatResponse:
+async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
+    if not _is_authenticated(page_request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     if not request.query or not request.query.strip():
         raise HTTPException(status_code=400, detail="Query text is required.")
 
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
 
-    result = await route_query(request.query, rag, history=request.history)
+    user_id = page_request.session.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    result: dict[str, Any] | None = None
+    error_response: str | None = None
+    try:
+        result = await route_query(request.query, rag, history=request.history)
+    except Exception:
+        error_response = "Failed to generate a response."
+
     if not result or "answer" not in result:
-        raise HTTPException(status_code=500, detail="Failed to generate a response.")
+        _save_chat_interaction(
+            user_id=int(user_id),
+            query=request.query.strip(),
+            response=error_response or "Failed to generate a response.",
+        )
+        raise HTTPException(status_code=500, detail=error_response or "Failed to generate a response.")
+
+    _save_chat_interaction(
+        user_id=int(user_id),
+        query=request.query.strip(),
+        response=str(result["answer"]),
+        language=result.get("language"),
+        emotion=result.get("emotion"),
+        intent=result.get("intent"),
+        resources=result.get("resources", []),
+    )
 
     return ChatResponse(
         answer=result["answer"],
@@ -284,10 +666,13 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)) -> dict:
+async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dict:
     """
     Transcribes speech input using Groq's Whisper model (whisper-large-v3).
     """
+    if not _is_authenticated(page_request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     if not config.GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="Groq API key is not configured.")
 

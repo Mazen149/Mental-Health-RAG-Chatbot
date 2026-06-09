@@ -65,5 +65,11 @@ class Config:
     QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")
 
+    # ------------------------------------------------------------------------------
+    # 6. Demo Authentication
+    # ------------------------------------------------------------------------------
+    SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-change-me")
+    CHAT_DATABASE_PATH = ARTIFACTS_DIR / "chat_interactions.sqlite3"
+
 # Expose a singleton instance
 config = Config()

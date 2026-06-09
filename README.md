@@ -94,6 +94,29 @@ graph TD
     *   Optional translation pipeline (`Helsinki-NLP/opus-mt-mul-en`) to translate queries before retrieval and enforce responses in the user's native language.
 *   **📈 Integrated Evaluation Suite**:
     *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, factual correctness, and context recall.
+    *   Includes a LangSmith-traced RAG evaluation runner for retrieval relevance, groundedness, answer relevance, and correctness.
+
+Run the evaluator with:
+
+```bash
+python -m src.modules.rag_evaluation --dataset path/to/eval.jsonl --output metrics/rag_eval_results.csv
+```
+
+If you want to generate a fresh evaluation file from the cached gold corpus, run:
+
+```bash
+python -m src.modules.eval_dataset_builder --source documents --output data/eval.jsonl
+```
+
+To export live chat logs for later manual review, use:
+
+```bash
+python -m src.modules.eval_dataset_builder --source interactions --output data/chat_review.jsonl
+```
+
+Those chat logs are useful for reviewing real user questions, but they should be manually annotated before you use them as correctness ground truth.
+
+Evaluation judges use a Groq model by default. Set `GROQ_API_KEY` and optionally `GROQ_EVALUATION_MODEL` if you want to override the default judge model.
 
 ---
 

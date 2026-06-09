@@ -484,10 +484,10 @@ class MentalHealthRAG:
                     "page_content": doc.page_content,
                     "response": doc.metadata.get("response", ""),
                 }
-                for doc in reranked_docs[:3]
+                for doc in reranked_docs[:5]
             ]
 
-            top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:3])])
+            top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:5])])
 
         if not language:
             language = "English"

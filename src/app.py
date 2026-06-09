@@ -8,6 +8,7 @@ asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
 """
 
 import importlib
+import asyncio
 import json
 import hashlib
 import os
@@ -19,7 +20,7 @@ from typing import Any, List
 
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
@@ -405,6 +406,29 @@ def _load_chat_history(user_id: int) -> list[dict[str, Any]]:
     return history
 
 
+def _split_stream_chunks(text: str, chunk_size: int = 24) -> list[str]:
+    words = text.split()
+    if not words:
+        return [text]
+
+    chunks: list[str] = []
+    current: list[str] = []
+    for word in words:
+        current.append(word)
+        if len(current) >= chunk_size:
+            chunks.append(" ".join(current))
+            current = []
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
+
+
+def _sse_event(event: str, data: Any) -> str:
+    payload = data if isinstance(data, str) else json.dumps(data, ensure_ascii=False)
+    payload = payload.replace("\n", "\ndata: ")
+    return f"event: {event}\ndata: {payload}\n\n"
+
+
 # ------------------------------------------------------------------------------
 # 5. Lifespan Event Listeners
 # ------------------------------------------------------------------------------
@@ -677,6 +701,57 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         emotion=result.get("emotion"),
         intent=result.get("intent"),
     )
+
+
+@app.post("/chat/stream")
+async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingResponse:
+    """Streams the generated answer as SSE chunks after the RAG response is ready."""
+    if not _is_authenticated(page_request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    if not request.query or not request.query.strip():
+        raise HTTPException(status_code=400, detail="Query text is required.")
+
+    if rag is None:
+        raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
+
+    user_id = page_request.session.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    try:
+        result = await route_query(request.query, rag, history=request.history)
+    except Exception:
+        result = {"answer": "Failed to generate a response.", "resources": []}
+
+    answer = str(result.get("answer", "")).strip() or "Failed to generate a response."
+    resources = result.get("resources", [])
+    _save_chat_interaction(
+        user_id=int(user_id),
+        query=request.query.strip(),
+        response=answer,
+        language=result.get("language"),
+        emotion=result.get("emotion"),
+        intent=result.get("intent"),
+        resources=resources,
+    )
+
+    async def event_generator():
+        yield _sse_event("meta", {
+            "language": result.get("language"),
+            "emotion": result.get("emotion"),
+            "intent": result.get("intent"),
+            "resources": resources,
+        })
+        yield _sse_event("start", {"status": "streaming"})
+
+        for chunk in _split_stream_chunks(answer, chunk_size=18):
+            yield _sse_event("chunk", {"text": chunk})
+            await asyncio.sleep(0.02)
+
+        yield _sse_event("done", {"status": "done"})
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 @app.post("/transcribe")

@@ -1,0 +1,73 @@
+{
+  "classify": {
+    "traces": [],
+    "train": [],
+    "demos": [
+      {
+        "augmented": true,
+        "text": "hello, how are you",
+        "type": "greeting",
+        "confidence": "0.95"
+      },
+      {
+        "augmented": true,
+        "text": "مرحبا، كيف حالك؟",
+        "type": "greeting",
+        "confidence": "0.95"
+      },
+      {
+        "augmented": true,
+        "text": "hola, qué tal?",
+        "type": "greeting",
+        "confidence": "1.0"
+      },
+      {
+        "augmented": true,
+        "text": "ہیلو، آپ کیسے ہیں؟",
+        "type": "greeting",
+        "confidence": "0.98"
+      },
+      {
+        "text": "كم سعر البيتكوين اليوم؟",
+        "type": "out_of_scope"
+      },
+      {
+        "text": "مجھے ہر وقت ڈر لگتا ہے اور نیند نہیں آتی",
+        "type": "asking_mental_health_question"
+      },
+      {
+        "text": "see you later",
+        "type": "goodbye"
+      },
+      {
+        "text": "je veux me tuer",
+        "type": "crisis"
+      }
+    ],
+    "signature": {
+      "instructions": "You are a strict intent classification engine for a mental-health support assistant.\nClassify the user's message into exactly one label: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis.\n\nGuidelines:\n- greeting: for greeting, introduction, small talk (e.g. sharing or asking about names, how are you).\n- goodbye: for farewell and parting words.\n- gratitude: for expressions of thanks or appreciation.\n- out_of_scope: for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).\n- asking_mental_health_question: for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.\n- crisis: for any query indicating suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.",
+      "fields": [
+        {
+          "prefix": "Text:",
+          "description": "The user message to classify"
+        },
+        {
+          "prefix": "Type:",
+          "description": "exactly one of: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis"
+        },
+        {
+          "prefix": "Confidence:",
+          "description": "confidence score of the intent classification, between 0.0 and 1.0"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

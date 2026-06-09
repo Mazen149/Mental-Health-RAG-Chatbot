@@ -46,6 +46,16 @@ class IntentClassifier:
         if groq_api_key:
             self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
             self.fallback_module = IntentClassifierModule()
+            
+            # Load optimized state if available
+            optimized_path = Path("artifacts/intent_classifier_optimized.json")
+            if optimized_path.exists():
+                try:
+                    self.fallback_module.load(str(optimized_path))
+                    print(f"--> [Intent Classifier] Loaded optimized DSPy weights from {optimized_path}")
+                except Exception as e:
+                    print(f"--> [Intent Classifier Error] Failed to load optimized weights: {e}")
+                    
             self.groq_client = self.lm  # keep for backwards compatibility / mock checks
         else:
             self.lm = None

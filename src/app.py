@@ -23,22 +23,9 @@ from langsmith import traceable
 from pydantic import BaseModel, Field
 
 # ------------------------------------------------------------------------------
-# 1. Environment Loading & Project Root Identification
+# 1. Environment Loading & Configuration
 # ------------------------------------------------------------------------------
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parent  # Fallback
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
+from .config import config
 
 # Local project imports (must load after environment resolution)
 from .modules.rag import MentalHealthRAG
@@ -137,13 +124,12 @@ def validate_environment() -> None:
     errors = []
     
     # Verify environment API variables
-    groq_api_key = os.getenv("GROQ_API_KEY")
-    hf_token = os.getenv("HF_TOKEN")
-    qdrant_url = os.getenv("QDRANT_URL")
-    qdrant_api_key = os.getenv("QDRANT_API_KEY")
+    groq_api_key = config.GROQ_API_KEY
+    hf_token = config.HF_TOKEN
+    qdrant_url = config.QDRANT_URL
+    qdrant_api_key = config.QDRANT_API_KEY
     
-    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    qdrant_local_path = os.path.join(base_dir, "qdrant_db")
+    qdrant_local_path = str(config.QDRANT_LOCAL_PATH)
     
     if not groq_api_key:
         errors.append("Missing environment variable: GROQ_API_KEY")
@@ -174,16 +160,16 @@ def validate_environment() -> None:
             errors.append(f"Missing required pip package: {pkg}")
             
     # Verify Module 1 Language Detection model pickles
-    mod1_vectorizer = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_vectorizer.pkl")
-    mod1_classifier = os.path.join(base_dir, "artifacts", "langauge_detection", "language_detection_best_model.pkl")
+    mod1_vectorizer = str(config.MOD1_VECTORIZER_PATH)
+    mod1_classifier = str(config.MOD1_CLASSIFIER_PATH)
     if not os.path.exists(mod1_vectorizer):
         errors.append(f"Module 1 vectorizer pickle not found at: {mod1_vectorizer}")
     if not os.path.exists(mod1_classifier):
         errors.append(f"Module 1 classifier pickle not found at: {mod1_classifier}")
         
     # Verify Module 2 Emotion Classification model adapter config
-    mod2_dir = os.path.join(base_dir, "artifacts", "emotion_classifier")
-    mod2_config = os.path.join(mod2_dir, "adapter_config.json")
+    mod2_dir = str(config.MOD2_DIR)
+    mod2_config = str(config.MOD2_CONFIG_PATH)
     if not os.path.exists(mod2_dir):
         errors.append(f"Module 2 model directory not found at: {mod2_dir}")
     elif not os.path.exists(mod2_config):
@@ -199,12 +185,12 @@ def validate_environment() -> None:
                 client = QdrantClient(path=qdrant_local_path)
             
             collections = [c.name for c in client.get_collections().collections]
-            if "mental_health" not in collections:
-                print("Notice: Qdrant collection 'mental_health' not found. It will be created on startup.")
+            if config.QDRANT_COLLECTION_NAME not in collections:
+                print(f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' not found. It will be created on startup.")
             else:
-                count_info = client.count(collection_name="mental_health")
+                count_info = client.count(collection_name=config.QDRANT_COLLECTION_NAME)
                 if count_info.count == 0:
-                    print("Notice: Qdrant collection 'mental_health' is empty. It will be populated on startup.")
+                    print(f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' is empty. It will be populated on startup.")
             client.close()
         except Exception as e:
             errors.append(f"Failed to connect to Qdrant or query collection: {e}")

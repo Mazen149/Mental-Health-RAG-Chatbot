@@ -8,33 +8,18 @@ crisis safety bypass triggers, and fallbacks to full semantic RAG logic.
 """
 
 import asyncio
+from langsmith import traceable
 import os
 from pathlib import Path
 import re
 
-from dotenv import load_dotenv
-from langsmith import traceable
-
 # ------------------------------------------------------------------------------
-# 1. Environment Loading & Project Root Identification
+# 1. Environment Loading & Configuration
 # ------------------------------------------------------------------------------
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parent  # Fallback
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
+from .config import config
 
 # Read toggle for query translation
-ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in ("true", "1", "yes")
+ENABLE_TRANSLATION = config.ENABLE_TRANSLATION
 
 # Local project imports
 from .modules import detect_language, classify_emotion, classify_intent
@@ -44,7 +29,7 @@ from .modules.multilingual_patterns import (
     GREETING_RESPONSES, GOODBYE_RESPONSES, GRATITUDE_RESPONSES,
     CRITICAL_CRISIS_RESPONSES, OUT_OF_SCOPE_RESPONSES
 )
-from .modules.rag import build_system_prompt, detect_crisis
+from .modules.rag import detect_crisis
 
 # ------------------------------------------------------------------------------
 # 2. Global Utilities & Helper Functions
@@ -105,7 +90,7 @@ def get_direct_gratitude(language: str) -> str:
     """Returns a direct warm gratitude acknowledgement in the user's language."""
     return GRATITUDE_RESPONSES.get(language, GRATITUDE_RESPONSES["English"])
 
-@traceable(name="serene.route_query", run_type="chain")
+@traceable(name="route_query", run_type="chain")
 async def route_query(query: str, rag_instance, history: list = None) -> dict:
     """
     Routes the user query dynamically in an asynchronous manner.
@@ -131,6 +116,35 @@ async def route_query(query: str, rag_instance, history: list = None) -> dict:
     except Exception as e:
         safe_print(f"Error in local language detection: {e}")
         language = "English"
+
+    # =============================================
+    # 0.5. PROMPT INJECTION GUARDRAIL (takes < 1ms)
+    # =============================================
+    from .modules.rag import detect_prompt_injection
+    if detect_prompt_injection(query):
+        safe_print("--> [Router Guardrail] Matched prompt injection indicator. Declining query.")
+        return {
+            "answer": OUT_OF_SCOPE_RESPONSES.get(language, OUT_OF_SCOPE_RESPONSES["English"]),
+            "resources": [],
+            "language": language,
+            "emotion": None,
+            "intent": "out_of_scope"
+        }
+
+    # =============================================
+    # 0.6. MEDICAL ADVICE BYPASS GUARDRAIL (takes < 1ms)
+    # =============================================
+    from .modules.rag import detect_medicine_query
+    if detect_medicine_query(query):
+        safe_print("--> [Router Guardrail] Matched medicine query keyword. Bypassing RAG and returning medical disclaimer.")
+        from .modules.multilingual_patterns import MEDICAL_DISCLAIMERS
+        return {
+            "answer": MEDICAL_DISCLAIMERS.get(language, MEDICAL_DISCLAIMERS["English"]),
+            "resources": [],
+            "language": language,
+            "emotion": None,
+            "intent": "out_of_scope"
+        }
 
     # =============================================
     # LAYER 1: Regex Fast-Path for Conversational Intents (20 languages)
@@ -249,15 +263,14 @@ async def route_query(query: str, rag_instance, history: list = None) -> dict:
     elif intent == "asking_mental_health_question":
         # Mental Health Topic -> Run full RAG pipeline
         safe_print("--> [Router] Routing to full Mental Health grounding RAG pipeline...")
-        system_prompt = build_system_prompt(emotions, language, query)
-        
         # Run synchronous RAG query in a thread to avoid blocking the event loop
         result = await asyncio.to_thread(
             rag_instance.query, 
             user_query=query, 
-            system_prompt=system_prompt, 
             translated_query=query_en,
-            history=history
+            history=history,
+            emotions=emotions,
+            language=language
         )
         return {
             "answer": result["answer"],

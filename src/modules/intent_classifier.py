@@ -5,26 +5,14 @@ from typing import Callable, Literal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import dspy
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 import numpy as np
 from pydantic import BaseModel, Field
 
 # Locate project root and load environment
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parents[2]
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
+from ..config import config
 
 
 class Intent(BaseModel):
@@ -42,21 +30,28 @@ class Intent(BaseModel):
     )
 
 
+from .prompts import IntentClassifierModule
+
+
 class IntentClassifier:
     """Intent classifier using embeddings and LLM fallback."""
 
     def __init__(self, llm_fallback: Callable[[str], Intent] | None = None):
         self.llm_fallback = llm_fallback or self._llm_fallback
 
-        # Initialize Groq client if available
-        groq_api_key = os.getenv("GROQ_API_KEY")
+        self.model_name = config.GROQ_CLASSIFIER_MODEL
+
+        # Initialize DSPy LM if API key is available
+        groq_api_key = config.GROQ_API_KEY
         if groq_api_key:
-            from groq import Groq
-            self.groq_client = Groq(api_key=groq_api_key)
+            self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
+            self.fallback_module = IntentClassifierModule()
+            self.groq_client = self.lm  # keep for backwards compatibility / mock checks
         else:
+            self.lm = None
+            self.fallback_module = None
             self.groq_client = None
 
-        self.model_name = os.getenv("GROQ_CLASSIFIER_MODEL", "openai/gpt-oss-20b")
 
         self.embedding_examples = {
             "greeting": [
@@ -101,7 +96,7 @@ class IntentClassifier:
         self.embedding_threshold = 0.65
         self.embedding_model = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         
-        hf_token = os.environ.get("HF_TOKEN")
+        hf_token = config.HF_TOKEN
         self.embedding_client = InferenceClient(
             provider="hf-inference",
             api_key=hf_token,
@@ -179,74 +174,25 @@ class IntentClassifier:
         return None
 
     def _llm_fallback(self, text: str) -> Intent:
-        # Try Groq API as the robust multilingual fallback
-        if self.groq_client is not None:
+        # Try DSPy predictor as the robust fallback
+        if self.fallback_module is not None and self.lm is not None:
             try:
-                chat_completion = self.groq_client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": self._system_prompt()},
-                        {"role": "user", "content": text}
-                    ],
-                    model=self.model_name,
-                    temperature=0.0,
-                    response_format={"type": "json_object"}
+                with dspy.context(lm=self.lm):
+                    res = self.fallback_module(text=text)
+                print(f"--> [Intent Classifier] Received DSPy response: {res}")
+                return Intent(
+                    type=res["type"],
+                    confidence=res["confidence"],
+                    classifier="llm"
                 )
-                content = chat_completion.choices[0].message.content
-                print(f"--> [Intent Classifier] Received LLM response: {content}")
-                return self._parse_llm_intent(content)
             except Exception as e:
                 try:
-                    print(f"--> [Intent Classifier Error] Groq API fallback failed: {e}")
+                    print(f"--> [Intent Classifier Error] DSPy API fallback failed: {e}")
                 except Exception:
                     pass
 
         # Return default if Groq fails or is not available
         return Intent(type="greeting", confidence=0.5, classifier="llm")
-
-    def _parse_llm_intent(self, content: str) -> Intent:
-        cleaned = str(content).strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.strip("`")
-            cleaned = cleaned.replace("json\n", "", 1).strip()
-
-        start = cleaned.find("{")
-        end = cleaned.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            cleaned = cleaned[start : end + 1]
-
-        data = json.loads(cleaned)
-        intent_type = data.get("type", "greeting")
-        if intent_type not in {"greeting", "goodbye", "gratitude", "out_of_scope", "asking_mental_health_question", "crisis"}:
-            intent_type = "greeting"
-
-        confidence = data.get("confidence", 0.5)
-        try:
-            confidence = float(confidence)
-        except (TypeError, ValueError):
-            confidence = 0.65
-        confidence = max(0.0, min(1.0, confidence))
-
-        return Intent(
-            type=intent_type,
-            confidence=confidence,
-            classifier="llm",
-        )
-
-    def _system_prompt(self) -> str:
-        return (
-            "You are a strict intent classification engine for a mental-health support assistant. "
-            "Classify the user's message into exactly one label: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis.\n"
-            "Use greeting for greetings, introductions (e.g. sharing or asking about names), and basic small talk about the assistant or user's state (e.g. how are you).\n"
-            "Use goodbye for farewells and parting words.\n"
-            "Use gratitude for expressions of thanks or appreciation.\n"
-            "Use crisis for any query containing suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.\n"
-            "Use asking_mental_health_question for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.\n"
-            "Use out_of_scope for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).\n"
-            "Return only valid JSON with exactly these keys: type, confidence, classifier. "
-            "The classifier value must always be llm. "
-            "Confidence must be a number from 0 to 1 reflecting how sure you are. "
-            "Do not include markdown, code fences, commentary, or extra keys."
-        )
 
     def _get_embedding(self, text: str) -> np.ndarray:
         if self.use_local:

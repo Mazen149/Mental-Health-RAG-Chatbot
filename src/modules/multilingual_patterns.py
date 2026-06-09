@@ -237,3 +237,27 @@ OUT_OF_SCOPE_RESPONSES = {
     "Vietnamese": "Tôi là trợ lý chuyên hỗ trợ sức khỏe tâm thần. Tôi chỉ có thể giúp đỡ các câu hỏi liên quan đến sức khỏe cảm xúc và tâm lý. Tôi có thể hỗ trợ bạn như thế nào trong lĩnh vực đó hôm nay?",
     "Chinese": "我是专门的心理健康支持助手。我只能协助解决与情感和心理健康相关的问题。今天我能在该领域为您提供什么支持吗？"
 }
+
+# Localized medical advice/prescriptions disclaimers for all 20 languages
+MEDICAL_DISCLAIMERS = {
+    "Arabic": "ملاحظة: أنا مساعد ذكاء اصطناعي ولست طبيباً. لا يمكنني تشخيص الحالات أو وصف الأدوية. يرجى استشارة طبيب مختص أو معالج نفسي.",
+    "Bulgarian": "Забележка: Аз съм виртуален асистент и не мога да предписвам лекарства или да давам медицински съвети. Моля, консултирайте се с квалифициран лекар.",
+    "German": "Hinweis: Ich bin ein KI-Assistent und kann keine Medikamente verschreiben oder medizinischen Rat erteilen. Bitte konsultieren Sie einen Arzt oder Psychiater.",
+    "Greek": "Σημείωση: Είμαι βοηθός τεχνητής νοημοσύνης και δεν μπορώ να συνταγογραφήσω φάρμακα ή να δώσω ιατρικές συμβουλές. Συμβουλευτείτε έναν γιατρό.",
+    "English": "Please note: I am an AI assistant and cannot prescribe medication or provide clinical medical advice. Please consult a qualified medical professional or psychiatrist.",
+    "Spanish": "Nota: Soy un asistente de IA y no puedo recetar medicamentos ni ofrecer asesoramiento médico. Consulta a un profesional de la salud calificado.",
+    "French": "Remarque : Je suis un assistant virtuel et je ne peux pas prescrire de médicaments ni donner de conseils médicaux. Veuillez consulter un professionnel de la santé.",
+    "Hindi": "कृपया ध्यान दें: मैं एक एआई सहायक हूँ और दवाएं नहीं लिख सकता या चिकित्सा सलाह नहीं दे सकता। कृपया डॉक्टर या मनोचिकित्सक से परामर्श लें।",
+    "Italian": "Nota: Sono un assistente IA e non posso prescrivere farmaci o fornire consulenza medica. Si prega di consultare un medico qualificato.",
+    "Japanese": "注意：私はAIアシスタントであり、薬の処方や医療的助言は行えません。専門の医師や精神科医にご相談ください。",
+    "Dutch": "Opmerking: Ik ben een AI-assistent en kan geen medicijnen voorschrijven of medisch advies geven. Raadpleeg een gekwalificeerde arts.",
+    "Polish": "Uwaga: Jestem asystentem AI i nie przepisuję leków ani nie udzielam porad medycznych. Skonsultuj się z wykwalifikowanym lekarzem.",
+    "Portuguese": "Aviso: Sou um assistente de IA e não posso receitar medicamentos ou fornecer aconselhamento médico. Consulte um médico qualificado.",
+    "Russian": "Примечание: Я ИИ-ассистент и не могу назначать лекарства или давать медицинские советы. Пожалуйста, обратитесь к врачу.",
+    "Swahili": "Kumbuka: Mimi ni msaidizi wa AI na siwezi kuagiza dawa au kutoa ushauri wa matibabu. Tafadhali tembelea daktari aliyefuzu.",
+    "Thai": "หมายเหตุ: ฉันเป็นผู้ช่วย AI และไม่สามารถจ่ายยาหรือให้คำแนะนำทางการแพทย์ได้ โปรดปรึกษาแพทย์หรือจิตแพทย์ผู้เชี่ยวชาญ",
+    "Turkish": "Not: Ben bir yapay zeka asistanıyım ve ilaç reçete edemem veya tıbbi tavsiye veremem. Lütfen uzman bir doktora danışın.",
+    "Urdu": "نوٹ: میں ایک اے آئی معاون ہوں اور ادویات تجویز کرنے یا طبی مشورہ دینے کا اہل نہیں ہوں۔ براہ کرم کسی مستند ڈاکٹر سے رجوع کریں۔",
+    "Vietnamese": "Lưu ý: Tôi là trợ lý AI và không thể kê đơn thuốc hoặc tư vấn y tế. Vui lòng tham khảo ý kiến bác sĩ chuyên khoa.",
+    "Chinese": "注意：我是AI助手，不能开具处方或提供医疗建议。请咨询合格的医生或精神科医生。"
+}

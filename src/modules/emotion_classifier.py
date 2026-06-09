@@ -4,25 +4,7 @@ import numpy as np
 import torch
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from peft import PeftModel
-from dotenv import load_dotenv
-
-# Locate project root and load environment
-_CURRENT_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = None
-for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
-    if (_parent / ".env").exists() or (_parent / "pyproject.toml").exists():
-        _PROJECT_ROOT = _parent
-        break
-if _PROJECT_ROOT is None:
-    _PROJECT_ROOT = _CURRENT_DIR.parents[2]
-
-_ENV_PATH = _PROJECT_ROOT / ".env"
-if _ENV_PATH.exists():
-    load_dotenv(dotenv_path=_ENV_PATH)
-else:
-    load_dotenv()
-
-_DEFAULT_MODEL_PATH = _PROJECT_ROOT / "artifacts" / "emotion_classifier"
+from ..config import config
 
 EMOTION_MAP = {
     0: "Sadness", 1: "Joy", 2: "Love",
@@ -33,16 +15,16 @@ EMOTION_MAP = {
 class EmotionClassifier:
     """Emotion classifier using XLM-RoBERTa-base + LoRA from emotion-classifier.ipynb."""
 
-    def __init__(self, model_path: str | Path = _DEFAULT_MODEL_PATH):
-        self.model_path = Path(model_path)
+    def __init__(self, model_path: str | Path | None = None):
+        self.model_path = Path(model_path) if model_path else config.MOD2_DIR
         if not self.model_path.exists():
             raise FileNotFoundError(f"Model directory not found: {self.model_path}")
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        hf_token = os.getenv("HF_TOKEN")
+        hf_token = config.HF_TOKEN
 
         base_model = AutoModelForSequenceClassification.from_pretrained(
-            "xlm-roberta-base",
+            config.EMOTION_BASE_MODEL,
             num_labels=len(EMOTION_MAP),
             dtype=torch.float32,
             ignore_mismatched_sizes=True,

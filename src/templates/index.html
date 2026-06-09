@@ -16,11 +16,11 @@
 
 <body>
   <div class="app-shell">
-    <!-- Top Decorative Blur Elements -->
     <div class="blur-glow glow-1"></div>
     <div class="blur-glow glow-2"></div>
 
     <header class="hero-header">
+      <div class="eyebrow">Secure, grounded mental-health support</div>
       <div class="header-icon-wrap">
         <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
@@ -29,59 +29,113 @@
         </svg>
       </div>
       <h1>Serene AI</h1>
-      <p>A safe, compassionate space for mental health support, grounded in professional counseling resources.</p>
+      <p>Professional mental-health guidance with authenticated access, saved interactions, and source-grounded responses.</p>
+      <div class="hero-pills">
+        <span>Private accounts</span>
+        <span>Persistent history</span>
+        <span>Clinical grounding</span>
+      </div>
     </header>
 
-    <main class="chat-container">
-      <!-- Chat Area Header -->
-      <div class="chat-header">
-        <div class="status-indicator">
-          <span class="status-dot pulsing"></span>
-          <span class="status-text">Active & Grounded</span>
+    <section class="workspace-grid">
+      <aside class="overview-panel">
+        <div class="overview-card">
+          <div class="overview-kicker">What you get</div>
+          <h2>Focused support, not noise</h2>
+          <p>
+            Sign in to keep your conversations tied to your account, then ask follow-up questions without losing context.
+          </p>
+          <ul class="feature-list">
+            <li>Secure sign-in before chat access</li>
+            <li>Saved prompts, responses, and metadata</li>
+            <li>Grounded answers with inline citations</li>
+          </ul>
         </div>
-        <div class="chat-actions">
-          <button type="button" id="clear-btn" class="clear-btn" title="Clear Chat History">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-            Clear Chat
-          </button>
-          <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
-        </div>
-      </div>
-
-      <!-- Chat Window -->
-      <section class="chat-window" id="chat-window">
-        <div class="bubble assistant system-intro">
-          <h3>Welcome to Serene AI</h3>
-          <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress,
-            relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.
+        <div class="overview-card subtle">
+          <div class="overview-kicker">Privacy note</div>
+          <p>
+            Credentials are stored as hashes, and each interaction is recorded to your profile for continuity and review.
           </p>
         </div>
-      </section>
+      </aside>
 
-      <!-- Chat Input Form -->
-      <form id="chat-form" class="chat-form">
-        <div class="input-wrapper">
-          <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
-          <button type="submit" id="send-btn" title="Send Message">
-            <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-              stroke-linecap="round" stroke-linejoin="round">
-              <line x1="22" y1="2" x2="11" y2="13"></line>
-              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-            </svg>
-          </button>
+      <main class="chat-container" id="chat-shell" aria-live="polite">
+        <div class="chat-header">
+          <div class="status-indicator">
+            <span class="status-dot pulsing"></span>
+            <span class="status-text" id="status-text">Waiting for sign-in</span>
+          </div>
+          <div class="chat-actions">
+            <div class="user-chip" id="user-chip" hidden>
+              <span class="user-dot"></span>
+              <span id="current-user">Guest</span>
+            </div>
+            <button type="button" id="logout-btn" class="ghost-btn" hidden>Logout</button>
+            <button type="button" id="clear-btn" class="clear-btn" title="Clear Chat History" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              Clear Chat
+            </button>
+            <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
+          </div>
         </div>
-      </form>
-    </main>
+
+        <section class="chat-window" id="chat-window">
+          <div class="bubble assistant system-intro">
+            <h3>Welcome to Serene AI</h3>
+            <p>Sign in to begin. Your account will keep your conversation history so we can support you with continuity and context.</p>
+          </div>
+        </section>
+
+        <form id="chat-form" class="chat-form">
+          <div class="input-wrapper">
+            <textarea id="query" placeholder="Sign in to start your conversation..." rows="1" disabled></textarea>
+            <button type="submit" id="send-btn" title="Send Message" disabled>
+              <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </form>
+      </main>
+    </section>
 
     <footer class="app-footer">
       <p>⚠️ <strong>Crisis Notice:</strong> If you are in immediate danger, please reach out to local emergency services
         or contact a national crisis hotline.</p>
     </footer>
+  </div>
+
+  <div class="auth-overlay" id="auth-overlay">
+    <div class="auth-card">
+      <div class="auth-badge">Secure access</div>
+      <h2>Sign in before starting a chat</h2>
+      <p class="auth-copy">
+        Create a private account or sign back in to continue your saved conversations.
+      </p>
+      <div class="auth-status" id="auth-status"></div>
+      <form id="auth-form" class="auth-form">
+        <label>
+          <span>Username</span>
+          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="Your username" />
+        </label>
+        <label>
+          <span>Password</span>
+          <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Your password" />
+        </label>
+        <div class="auth-actions">
+          <button type="submit" class="auth-btn primary" data-auth-mode="login">Sign in</button>
+          <button type="button" class="auth-btn secondary" data-auth-mode="register">Create account</button>
+        </div>
+      </form>
+      <p class="auth-footnote">Your password is stored as a hash. We save your chat interactions to your account for continuity.</p>
+    </div>
   </div>
 
   <!-- Formatting & Security Libraries -->
@@ -95,10 +149,158 @@
     const queryInput = document.getElementById('query');
     const sendBtn = document.getElementById('send-btn');
     const clearBtn = document.getElementById('clear-btn');
+    const authOverlay = document.getElementById('auth-overlay');
+    const authForm = document.getElementById('auth-form');
+    const authStatus = document.getElementById('auth-status');
+    const authUsername = document.getElementById('auth-username');
+    const authPassword = document.getElementById('auth-password');
+    const statusText = document.getElementById('status-text');
+    const userChip = document.getElementById('user-chip');
+    const currentUser = document.getElementById('current-user');
+    const logoutBtn = document.getElementById('logout-btn');
+    const chatShell = document.getElementById('chat-shell');
+    const authModeButtons = document.querySelectorAll('[data-auth-mode]');
     const chatHistory = [];
+    let authenticated = false;
+    let activeAuthMode = 'login';
+
+    const setAuthMessage = (message, type = 'info') => {
+      authStatus.textContent = message || '';
+      authStatus.dataset.type = type;
+    };
+
+    const setChatLocked = (locked) => {
+      authenticated = !locked;
+      queryInput.disabled = locked;
+      sendBtn.disabled = locked;
+      clearBtn.disabled = locked;
+      logoutBtn.hidden = locked;
+      userChip.hidden = locked;
+      chatShell.classList.toggle('is-locked', locked);
+      statusText.textContent = locked ? 'Waiting for sign-in' : 'Secure session active';
+      queryInput.placeholder = locked ? 'Sign in to start your conversation...' : 'Type your message here...';
+    };
+
+    const resetSystemIntro = (username = null) => {
+      const existing = chatWindow.querySelector('.system-intro');
+      if (!existing) return;
+      existing.innerHTML = username
+        ? `<h3>Welcome back, ${safeSanitize(username)}</h3><p>Your session is active. Ask your next question and we will keep the full conversation history attached to your account.</p>`
+        : `<h3>Welcome to Serene AI</h3><p>Sign in to begin. Your account will keep your conversation history so we can support you with continuity and context.</p>`;
+    };
+
+    const setAuthenticatedUser = (username) => {
+      currentUser.textContent = username;
+      userChip.hidden = false;
+      logoutBtn.hidden = false;
+      setAuthMessage('');
+      authOverlay.classList.add('hidden');
+      setChatLocked(false);
+      resetSystemIntro(username);
+      queryInput.focus();
+    };
+
+    const showAuthOverlay = () => {
+      authOverlay.classList.remove('hidden');
+      setChatLocked(true);
+      authUsername.focus();
+    };
+
+    authModeButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        activeAuthMode = button.dataset.authMode || 'login';
+        authModeButtons.forEach((item) => item.classList.remove('active'));
+        button.classList.add('active');
+        setAuthMessage(activeAuthMode === 'register' ? 'Create a secure account to continue.' : 'Sign in to your existing account.');
+        if (activeAuthMode === 'register') {
+          authForm.requestSubmit();
+        }
+      });
+    });
+
+    if (authModeButtons[0]) {
+      authModeButtons[0].classList.add('active');
+    }
+
+    authForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const username = authUsername.value.trim();
+      const password = authPassword.value;
+
+      if (!username || !password) {
+        setAuthMessage('Please enter both a username and password.', 'error');
+        return;
+      }
+
+      setAuthMessage(activeAuthMode === 'register' ? 'Creating your account...' : 'Signing you in...');
+
+      try {
+        const response = await fetch(activeAuthMode === 'register' ? '/auth/register' : '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ username, password }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail || data.message || 'Authentication failed.');
+        }
+
+        authPassword.value = '';
+        setAuthenticatedUser(data.username);
+        setAuthMessage(data.message || 'Signed in successfully.', 'success');
+      } catch (error) {
+        setAuthMessage(error.message || 'Unable to sign in right now.', 'error');
+      }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch (error) {
+        console.error('Logout failed:', error);
+      } finally {
+        authenticated = false;
+        chatHistory.length = 0;
+        queryInput.value = '';
+        queryInput.style.height = 'auto';
+        chatWindow.innerHTML = '';
+        const intro = document.createElement('div');
+        intro.className = 'bubble assistant system-intro';
+        intro.innerHTML = `
+          <h3>Welcome to Serene AI</h3>
+          <p>Sign in to begin. Your account will keep your conversation history so we can support you with continuity and context.</p>
+        `;
+        chatWindow.appendChild(intro);
+        authUsername.value = '';
+        authPassword.value = '';
+        resetSystemIntro();
+        showAuthOverlay();
+      }
+    });
+
+    const checkExistingSession = async () => {
+      try {
+        const response = await fetch('/auth/me', { credentials: 'include' });
+        if (!response.ok) {
+          showAuthOverlay();
+          return;
+        }
+        const data = await response.json();
+        setAuthenticatedUser(data.username);
+      } catch (error) {
+        console.error('Session check failed:', error);
+        showAuthOverlay();
+      }
+    };
 
     // Clear Chat history
     clearBtn.addEventListener('click', () => {
+      if (!authenticated) return;
       chatHistory.length = 0;
       const welcomeMessage = chatWindow.querySelector('.system-intro');
       chatWindow.innerHTML = '';
@@ -380,6 +582,12 @@
 
     chatForm.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!authenticated) {
+        showAuthOverlay();
+        setAuthMessage('Please sign in before asking the RAG system.', 'error');
+        return;
+      }
+
       const query = queryInput.value.trim();
       if (!query) return;
 
@@ -401,6 +609,7 @@
         const response = await fetch('/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ query, history: historyToSend }),
         });
 
@@ -421,6 +630,9 @@
 
           // Add assistant response to history
           chatHistory.push({ role: 'assistant', content: data.answer });
+        } else if (response.status === 401) {
+          showAuthOverlay();
+          setAuthMessage(data.detail || 'Your session expired. Please sign in again.', 'error');
         } else {
           chatHistory.pop(); // Remove failed user message from history
           addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
@@ -431,6 +643,8 @@
         addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
       }
     });
+
+    checkExistingSession();
   </script>
 </body>
 

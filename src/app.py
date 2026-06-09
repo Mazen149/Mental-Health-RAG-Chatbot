@@ -615,6 +615,20 @@ async def chat_history(request: Request) -> list[dict[str, Any]]:
     return _load_chat_history(int(user_id))
 
 
+@app.post("/chat/clear")
+async def clear_chat(request: Request) -> dict:
+    if not _is_authenticated(request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = request.session.get("user_id")
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+    with _db_connection() as conn:
+        conn.execute("DELETE FROM chat_interactions WHERE user_id = ?", (int(user_id),))
+        conn.commit()
+    return {"status": "ok", "message": "Chat history cleared successfully."}
+
+
+
 @app.post("/chat", response_model=ChatResponse)
 async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""

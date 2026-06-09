@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serene AI - Empathetic Mental Health Support</title>
+  <title>Sanad AI - Empathetic Mental Health Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
@@ -26,7 +26,7 @@
           </svg>
         </div>
         <p class="eyebrow">Secure access</p>
-        <h1>Serene AI</h1>
+        <h1>Sanad AI</h1>
         <p class="auth-copy">Sign in to continue to the full-screen mental health support workspace.</p>
       </div>
 
@@ -68,7 +68,7 @@
           </svg>
         </div>
         <p class="eyebrow">Create account</p>
-        <h1>Serene AI</h1>
+        <h1>Sanad AI</h1>
         <p class="auth-copy">Create your account first, then sign in to access your workspace.</p>
       </div>
 
@@ -116,8 +116,8 @@
         </div>
         <div>
           <p class="eyebrow">Welcome back{% if username %}, {{ username }}{% endif %}</p>
-          <h1>Serene AI</h1>
-          <p>A full-screen, grounded support workspace for compassionate mental health conversations.</p>
+          <h1>Sanad AI</h1>
+          <p class="hero-desc">A full-screen, grounded support workspace for compassionate mental health conversations.</p>
         </div>
       </div>
 
@@ -148,7 +148,7 @@
 
       <section class="chat-window" id="chat-window">
         <div class="bubble assistant system-intro">
-          <h3>Welcome to Serene AI</h3>
+          <h3>Welcome to Sanad AI</h3>
           <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress,
             relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.
           </p>
@@ -195,7 +195,13 @@
     const clearBtn = document.getElementById('clear-btn');
     const chatHistory = [];
 
-    clearBtn.addEventListener('click', () => {
+    clearBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/chat/clear', { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to clear database');
+      } catch (error) {
+        console.error('Error clearing database chat history:', error);
+      }
       chatHistory.length = 0;
       const welcomeMessage = chatWindow.querySelector('.system-intro');
       chatWindow.innerHTML = '';
@@ -205,7 +211,7 @@
         const intro = document.createElement('div');
         intro.className = 'bubble assistant system-intro';
         intro.innerHTML = `
-            <h3>Welcome to Serene AI</h3>
+            <h3>Welcome to Sanad AI</h3>
             <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress, relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.</p>
           `;
         chatWindow.appendChild(intro);
@@ -283,12 +289,12 @@
     };
 
     const EMOTION_MAP = {
-      "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
-      "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
-      "Love": { emoji: "💖", label: "Love", class: "emo-love" },
-      "Anger": { emoji: "🧡", label: "Anger", class: "emo-anger" },
-      "Fear": { emoji: "💜", label: "Fear", class: "emo-fear" },
-      "Surprise": { emoji: "💚", label: "Surprise", class: "emo-surprise" }
+      "Sadness": { emoji: "😢", label: "Sadness", class: "emo-sadness" },
+      "Joy": { emoji: "😊", label: "Joy", class: "emo-joy" },
+      "Love": { emoji: "🥰", label: "Love", class: "emo-love" },
+      "Anger": { emoji: "😡", label: "Anger", class: "emo-anger" },
+      "Fear": { emoji: "😱", label: "Fear", class: "emo-fear" },
+      "Surprise": { emoji: "😲", label: "Surprise", class: "emo-surprise" }
     };
 
     const addBubble = (text, role, metadata = null) => {
@@ -541,6 +547,38 @@
     let audioChunks = [];
     let isRecording = false;
 
+    // Web Audio API variables for silence detection
+    let audioContext = null;
+    let analyser = null;
+    let streamSource = null;
+    let checkSilenceInterval = null;
+
+    const SILENCE_THRESHOLD = 0.015; // Silence volume threshold (RMS)
+    const SILENCE_DURATION = 2000;   // Auto stop after 2000ms of silence
+
+    const stopRecording = () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micBtn.title = 'Record Voice';
+      cleanupAudioContext();
+    };
+
+    const cleanupAudioContext = () => {
+      if (checkSilenceInterval) {
+        clearInterval(checkSilenceInterval);
+        checkSilenceInterval = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      analyser = null;
+      streamSource = null;
+    };
+
     micBtn.addEventListener('click', async () => {
       if (!isRecording) {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -553,6 +591,41 @@
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
 
+          // Setup Web Audio Analyzer for silence detection
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 512;
+          streamSource = audioContext.createMediaStreamSource(stream);
+          streamSource.connect(analyser);
+
+          const bufferLength = analyser.frequencyBinCount;
+          const dataArray = new Float32Array(bufferLength);
+          let silenceStart = null;
+
+          checkSilenceInterval = setInterval(() => {
+            if (!isRecording || !analyser) return;
+
+            analyser.getFloatTimeDomainData(dataArray);
+
+            // Compute volume level using Root Mean Square (RMS)
+            let sumSquares = 0.0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sumSquares += dataArray[i] * dataArray[i];
+            }
+            const rms = Math.sqrt(sumSquares / dataArray.length);
+
+            if (rms < SILENCE_THRESHOLD) {
+              if (silenceStart === null) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                console.log("Silence threshold met, auto-stopping recording...");
+                stopRecording();
+              }
+            } else {
+              silenceStart = null; // voice activity detected, reset silence timer
+            }
+          }, 100);
+
           mediaRecorder.ondataavailable = (event) => {
             if (event.data.size > 0) {
               audioChunks.push(event.data);
@@ -561,6 +634,7 @@
 
           mediaRecorder.onstop = async () => {
             stream.getTracks().forEach(track => track.stop());
+            cleanupAudioContext();
 
             const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
             const originalPlaceholder = queryInput.placeholder;
@@ -586,6 +660,8 @@
                 queryInput.value = data.text;
                 queryInput.style.height = 'auto';
                 queryInput.style.height = (queryInput.scrollHeight) + 'px';
+                // Auto-submit transcription to chat form
+                chatForm.requestSubmit();
               }
             } catch (err) {
               console.error('Transcription error:', err);
@@ -602,18 +678,14 @@
           isRecording = true;
           micBtn.classList.add('recording');
           micBtn.title = 'Stop Recording';
-          queryInput.placeholder = 'Listening... Speak clearly. Click mic again to stop.';
+          queryInput.placeholder = 'Listening... Speak clearly. Auto-stops on silence.';
         } catch (err) {
           console.error('Error starting audio recording:', err);
           alert('Could not access microphone. Please check permissions.');
+          cleanupAudioContext();
         }
       } else {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-          mediaRecorder.stop();
-        }
-        isRecording = false;
-        micBtn.classList.remove('recording');
-        micBtn.title = 'Record Voice';
+        stopRecording();
       }
     });
 

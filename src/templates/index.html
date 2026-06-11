@@ -4,84 +4,175 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Serene AI - Empathetic Mental Health Support</title>
-  <!-- Premium Fonts -->
+  <title>Sanad AI - Empathetic Mental Health Support</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css" />
 </head>
 
-<body>
+<body class="{% if mode in ['login', 'register'] %}login-mode{% else %}chat-mode{% endif %}">
+  {% if mode == 'login' %}
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <div class="auth-brand">
+        <div class="auth-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <p class="eyebrow">Secure access</p>
+        <h1>Sanad AI</h1>
+        <p class="auth-copy">Sign in to continue to the full-screen mental health support workspace.</p>
+      </div>
+
+      <form class="auth-form" method="post" action="/login">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" placeholder="Choose a username" autocomplete="username" required>
+        </label>
+
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Choose a password" autocomplete="current-password" required>
+        </label>
+
+        {% if error %}
+        <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <button type="submit" class="auth-submit">Sign in</button>
+      </form>
+
+      <div class="auth-note">
+        New here? <a href="/register">Create an account</a> to get started.
+        {% if success %}
+        <div class="auth-success">Account created successfully. Please sign in.</div>
+        {% endif %}
+      </div>
+    </section>
+  </main>
+  {% elif mode == 'register' %}
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <div class="auth-brand">
+        <div class="auth-mark">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <p class="eyebrow">Create account</p>
+        <h1>Sanad AI</h1>
+        <p class="auth-copy">Create your account first, then sign in to access your workspace.</p>
+      </div>
+
+      <form class="auth-form" method="post" action="/register">
+        <label>
+          <span>Username</span>
+          <input type="text" name="username" placeholder="Choose a username" autocomplete="username" required>
+        </label>
+
+        <label>
+          <span>Password</span>
+          <input type="password" name="password" placeholder="Choose a password" autocomplete="new-password" required>
+        </label>
+
+        <label>
+          <span>Confirm password</span>
+          <input type="password" name="confirm_password" placeholder="Repeat your password" autocomplete="new-password" required>
+        </label>
+
+        {% if error %}
+        <div class="auth-error">{{ error }}</div>
+        {% endif %}
+
+        <button type="submit" class="auth-submit">Create account</button>
+      </form>
+
+      <div class="auth-note">
+        Already have an account? <a href="/login">Go to login</a>.
+      </div>
+    </section>
+  </main>
+  {% else %}
   <div class="app-shell">
     <div class="blur-glow glow-1"></div>
     <div class="blur-glow glow-2"></div>
 
     <header class="hero-header">
-      <div class="eyebrow">Secure, grounded mental-health support</div>
-      <div class="header-icon-wrap">
-        <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
-          <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
-          <line x1="12" y1="19" x2="12" y2="22" />
-        </svg>
+      <div class="hero-copy">
+        <div class="header-icon-wrap">
+          <svg class="header-logo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+            <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
+            <line x1="12" y1="19" x2="12" y2="22" />
+          </svg>
+        </div>
+        <div>
+          <p class="eyebrow">Welcome back{% if username %}, {{ username }}{% endif %}</p>
+          <h1>Sanad AI</h1>
+          <p class="hero-desc">A full-screen, grounded support workspace for compassionate mental health conversations.</p>
+        </div>
       </div>
-      <h1>Serene AI</h1>
-      <p>Professional mental-health guidance with authenticated access, saved interactions, and source-grounded responses.</p>
-      <div class="hero-pills">
-        <span>Private accounts</span>
-        <span>Persistent history</span>
-        <span>Clinical grounding</span>
-      </div>
+
+      <form method="post" action="/logout" class="logout-form">
+        <button type="submit" class="logout-btn">Logout</button>
+      </form>
     </header>
 
-    <section class="workspace-grid">
-      <aside class="overview-panel">
-        <div class="overview-card">
-          <div class="overview-kicker">What you get</div>
-          <h2>Focused support, not noise</h2>
-          <p>
-            Sign in to keep your conversations tied to your account, then ask follow-up questions without losing context.
-          </p>
-          <ul class="feature-list">
-            <li>Secure sign-in before chat access</li>
-            <li>Saved prompts, responses, and metadata</li>
-            <li>Grounded answers with inline citations</li>
-          </ul>
+    <main class="chat-container">
+      <div class="chat-header">
+        <div class="status-indicator">
+          <span class="status-dot pulsing"></span>
+          <span class="status-text">Active & Grounded</span>
         </div>
-        <div class="overview-card subtle">
-          <div class="overview-kicker">Privacy note</div>
-          <p>
-            Credentials are stored as hashes, and each interaction is recorded to your profile for continuity and review.
-          </p>
+        <div class="chat-actions">
+          <button type="button" id="clear-btn" class="clear-btn" title="Clear Chat History">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Clear Chat
+          </button>
+          <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
         </div>
-      </aside>
+      </div>
 
-      <main class="chat-container" id="chat-shell" aria-live="polite">
-        <div class="chat-header">
-          <div class="status-indicator">
-            <span class="status-dot pulsing"></span>
-            <span class="status-text" id="status-text">Waiting for sign-in</span>
-          </div>
-          <div class="chat-actions">
-            <div class="user-chip" id="user-chip" hidden>
-              <span class="user-dot"></span>
-              <span id="current-user">Guest</span>
-            </div>
-            <button type="button" id="logout-btn" class="ghost-btn" hidden>Logout</button>
-            <button type="button" id="clear-btn" class="clear-btn" title="Clear Chat History" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                style="width: 14px; height: 14px; vertical-align: middle; margin-right: 4px;">
-                <path d="M3 6h18" />
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-              </svg>
-              Clear Chat
-            </button>
-            <div class="model-badge">GPT-20B & XLM-RoBERTa</div>
-          </div>
+      <section class="chat-window" id="chat-window">
+        <div class="bubble assistant system-intro">
+          <h3>Welcome to Sanad AI</h3>
+          <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress,
+            relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.
+          </p>
+        </div>
+      </section>
+
+      <form id="chat-form" class="chat-form">
+        <div class="input-wrapper">
+          <textarea id="query" placeholder="How are you feeling today? Ask me anything..." rows="1"></textarea>
+          <button type="button" id="mic-btn" class="mic-btn" title="Record Voice">
+            <svg class="mic-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round" style="width: 18px; height: 18px;">
+              <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+              <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
+              <line x1="12" y1="19" x2="12" y2="22"></line>
+            </svg>
+          </button>
+          <button type="submit" id="send-btn" class="send-btn" title="Send Message">
+            <svg class="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
         </div>
 
         <section class="chat-window" id="chat-window">
@@ -112,33 +203,6 @@
     </footer>
   </div>
 
-  <div class="auth-overlay" id="auth-overlay">
-    <div class="auth-card">
-      <div class="auth-badge">Secure access</div>
-      <h2>Sign in before starting a chat</h2>
-      <p class="auth-copy">
-        Create a private account or sign back in to continue your saved conversations.
-      </p>
-      <div class="auth-status" id="auth-status"></div>
-      <form id="auth-form" class="auth-form">
-        <label>
-          <span>Username</span>
-          <input id="auth-username" name="username" type="text" autocomplete="username" placeholder="Your username" />
-        </label>
-        <label>
-          <span>Password</span>
-          <input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="Your password" />
-        </label>
-        <div class="auth-actions">
-          <button type="submit" class="auth-btn primary" data-auth-mode="login">Sign in</button>
-          <button type="button" class="auth-btn secondary" data-auth-mode="register">Create account</button>
-        </div>
-      </form>
-      <p class="auth-footnote">Your password is stored as a hash. We save your chat interactions to your account for continuity.</p>
-    </div>
-  </div>
-
-  <!-- Formatting & Security Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.4.4/purify.min.js"
     integrity="sha512-kZyPUuI05e7lSNACV16tUuep5gqj3QJ9nlFXhDDt5w2I1gW0bC2PrTk6lqROq13t9QnVfV3o7YJm1n2L9sZ7Lw=="
@@ -298,9 +362,13 @@
       }
     };
 
-    // Clear Chat history
-    clearBtn.addEventListener('click', () => {
-      if (!authenticated) return;
+    clearBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/chat/clear', { method: 'POST' });
+        if (!response.ok) throw new Error('Failed to clear database');
+      } catch (error) {
+        console.error('Error clearing database chat history:', error);
+      }
       chatHistory.length = 0;
       const welcomeMessage = chatWindow.querySelector('.system-intro');
       chatWindow.innerHTML = '';
@@ -310,20 +378,18 @@
         const intro = document.createElement('div');
         intro.className = 'bubble assistant system-intro';
         intro.innerHTML = `
-            <h3>Welcome to Serene AI</h3>
+            <h3>Welcome to Sanad AI</h3>
             <p>I am here to listen and support you. You can ask me questions about anxiety, depression, stress, relationships, or anything else on your mind. All my answers are grounded in trusted counseling guidelines.</p>
           `;
         chatWindow.appendChild(intro);
       }
     });
 
-    // Auto-grow textarea height
     queryInput.addEventListener('input', function () {
       this.style.height = 'auto';
       this.style.height = (this.scrollHeight) + 'px';
     });
 
-    // Enter key submits (Shift+Enter inserts new line)
     queryInput.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' && !event.shiftKey) {
         event.preventDefault();
@@ -346,6 +412,38 @@
       return markdown || '';
     };
 
+    const loadChatHistory = async () => {
+      try {
+        const response = await fetch('/chat/history');
+        if (!response.ok) return;
+
+        const history = await response.json();
+        if (!Array.isArray(history) || history.length === 0) return;
+
+        chatWindow.innerHTML = '';
+        chatHistory.length = 0;
+
+        history.forEach((message) => {
+          if (message.role === 'user') {
+            addBubble(message.content, 'user');
+            chatHistory.push({ role: 'user', content: message.content });
+          } else if (message.role === 'assistant') {
+            const bubbleWrapper = addBubble(message.content, 'assistant', {
+              language: message.language,
+              emotion: message.emotion,
+              intent: message.intent
+            });
+            if (Array.isArray(message.resources) && message.resources.length > 0) {
+              addCitations(message.resources, bubbleWrapper);
+            }
+            chatHistory.push({ role: 'assistant', content: message.content });
+          }
+        });
+      } catch (error) {
+        console.error('Failed to load chat history:', error);
+      }
+    };
+
     const safeSanitize = (text) => {
       try {
         if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
@@ -357,21 +455,19 @@
       return text || '';
     };
 
-    // Emotion mappings to beautiful emojis and custom CSS classes
     const EMOTION_MAP = {
-      "Sadness": { emoji: "💙", label: "Sadness", class: "emo-sadness" },
-      "Joy": { emoji: "💛", label: "Joy", class: "emo-joy" },
-      "Love": { emoji: "💖", label: "Love", class: "emo-love" },
-      "Anger": { emoji: "🧡", label: "Anger", class: "emo-anger" },
-      "Fear": { emoji: "💜", label: "Fear", class: "emo-fear" },
-      "Surprise": { emoji: "💚", label: "Surprise", class: "emo-surprise" }
+      "Sadness": { emoji: "😢", label: "Sadness", class: "emo-sadness" },
+      "Joy": { emoji: "😊", label: "Joy", class: "emo-joy" },
+      "Love": { emoji: "🥰", label: "Love", class: "emo-love" },
+      "Anger": { emoji: "😡", label: "Anger", class: "emo-anger" },
+      "Fear": { emoji: "😱", label: "Fear", class: "emo-fear" },
+      "Surprise": { emoji: "😲", label: "Surprise", class: "emo-surprise" }
     };
 
     const addBubble = (text, role, metadata = null) => {
       const wrapper = document.createElement('div');
       wrapper.className = `bubble-wrapper ${role}-wrapper`;
 
-      // Create Avatar element
       const avatar = document.createElement('div');
       avatar.className = `avatar ${role}-avatar`;
       if (role === 'assistant') {
@@ -391,7 +487,6 @@
           `;
       }
 
-      // Create bubble content wrapper (holds bubble + pills + citations)
       const contentArea = document.createElement('div');
       contentArea.className = 'bubble-content-area';
 
@@ -408,7 +503,6 @@
               </div>
             `;
         } else {
-          // Replace [1], [2], [3] citations with pretty interactive inline-citation badges
           let formattedText = text || '';
           formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
             return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
@@ -421,12 +515,10 @@
 
       contentArea.appendChild(bubble);
 
-      // Add Metadata pills if present (for assistant only)
       if (role === 'assistant' && metadata && text !== 'Thinking...') {
         const metaContainer = document.createElement('div');
         metaContainer.className = 'meta-pills';
 
-        // 1. Language pill
         if (metadata.language) {
           const langPill = document.createElement('span');
           langPill.className = 'meta-pill language-pill';
@@ -434,7 +526,6 @@
           metaContainer.appendChild(langPill);
         }
 
-        // 2. Emotion pills
         if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
           metadata.emotion.forEach(emo => {
             const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
@@ -445,7 +536,6 @@
           });
         }
 
-        // 3. Intent pill
         if (metadata.intent) {
           const intentPill = document.createElement('span');
           intentPill.className = 'meta-pill intent-pill';
@@ -458,7 +548,6 @@
         contentArea.appendChild(metaContainer);
       }
 
-      // Arrange elements in bubble wrapper depending on role
       if (role === 'assistant') {
         wrapper.appendChild(avatar);
         wrapper.appendChild(contentArea);
@@ -472,6 +561,48 @@
       return wrapper;
     };
 
+    const appendAssistantMetadata = (wrapper, metadata) => {
+      if (!metadata) return;
+
+      const contentArea = wrapper.querySelector('.bubble-content-area');
+      if (!contentArea) return;
+
+      let metaContainer = contentArea.querySelector('.meta-pills');
+      if (!metaContainer) {
+        metaContainer = document.createElement('div');
+        metaContainer.className = 'meta-pills';
+        contentArea.appendChild(metaContainer);
+      }
+
+      metaContainer.innerHTML = '';
+
+      if (metadata.language) {
+        const langPill = document.createElement('span');
+        langPill.className = 'meta-pill language-pill';
+        langPill.innerHTML = `🌐 ${metadata.language}`;
+        metaContainer.appendChild(langPill);
+      }
+
+      if (Array.isArray(metadata.emotion) && metadata.emotion.length > 0) {
+        metadata.emotion.forEach(emo => {
+          const emoConfig = EMOTION_MAP[emo] || { emoji: "🧠", label: emo, class: "emo-default" };
+          const emoPill = document.createElement('span');
+          emoPill.className = `meta-pill emotion-pill ${emoConfig.class}`;
+          emoPill.innerHTML = `${emoConfig.emoji} ${emoConfig.label}`;
+          metaContainer.appendChild(emoPill);
+        });
+      }
+
+      if (metadata.intent) {
+        const intentPill = document.createElement('span');
+        intentPill.className = 'meta-pill intent-pill';
+        let cleanIntent = metadata.intent.replace(/_/g, ' ');
+        if (cleanIntent === 'asking mental health question') cleanIntent = 'Counseling';
+        intentPill.innerHTML = `🧠 ${cleanIntent.charAt(0).toUpperCase() + cleanIntent.slice(1)}`;
+        metaContainer.appendChild(intentPill);
+      }
+    };
+
     const addCitations = (resources, parentWrapper) => {
       if (!Array.isArray(resources) || resources.length === 0) return;
 
@@ -481,7 +612,6 @@
       const citationWrapper = document.createElement('div');
       citationWrapper.className = 'citation-wrapper';
 
-      // Expandable Title Header
       const header = document.createElement('div');
       header.className = 'citation-header';
       header.innerHTML = `
@@ -546,7 +676,6 @@
         body.appendChild(item);
       });
 
-      // Toggle Expand/Collapse
       header.addEventListener('click', () => {
         body.classList.toggle('collapsed');
         header.classList.toggle('expanded');
@@ -556,6 +685,67 @@
       citationWrapper.appendChild(body);
       contentArea.appendChild(citationWrapper);
       chatWindow.scrollTop = chatWindow.scrollHeight;
+    };
+
+    const parseSSEStream = async (response, handlers) => {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let eventType = 'message';
+      let dataLines = [];
+
+      const flushEvent = () => {
+        if (!dataLines.length) return;
+        const data = dataLines.join('\n');
+        if (handlers[eventType]) {
+          handlers[eventType](data);
+        }
+        eventType = 'message';
+        dataLines = [];
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+        let lineBreakIndex;
+        while ((lineBreakIndex = buffer.indexOf('\n')) !== -1) {
+          const line = buffer.slice(0, lineBreakIndex).replace(/\r$/, '');
+          buffer = buffer.slice(lineBreakIndex + 1);
+
+          if (!line) {
+            flushEvent();
+            continue;
+          }
+
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+            continue;
+          }
+
+          if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
+
+        if (done) break;
+      }
+
+      if (buffer.trim()) {
+        const remainingLines = buffer.split(/\r?\n/);
+        for (const line of remainingLines) {
+          if (!line) continue;
+          if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+            continue;
+          }
+          if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5).trimStart());
+          }
+        }
+      }
+
+      flushEvent();
     };
 
     window.highlightSource = (event, index) => {
@@ -574,7 +764,7 @@
           const targetItem = items[index - 1];
           targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           targetItem.classList.remove('highlight-pulse');
-          void targetItem.offsetWidth; // Force reflow
+          void targetItem.offsetWidth;
           targetItem.classList.add('highlight-pulse');
         }
       }
@@ -591,61 +781,236 @@
       const query = queryInput.value.trim();
       if (!query) return;
 
-      // Reset input area
+      sendBtn.disabled = true;
       queryInput.value = '';
       queryInput.style.height = 'auto';
 
-      // Add user bubble and thinking state
       addBubble(query, 'user');
       const thinkingBubble = addBubble('Thinking...', 'assistant');
-
-      // Slice history to send optimized rolling window
+      const assistantWrapper = thinkingBubble;
+      const assistantBubble = assistantWrapper.querySelector('.bubble');
       const historyToSend = chatHistory.slice(-6);
-
-      // Add user query to history
       chatHistory.push({ role: 'user', content: query });
+      let streamedText = '';
+      let streamedMetadata = null;
+      let resources = [];
+      let streamStarted = false;
 
       try {
-        const response = await fetch('/chat', {
+        const response = await fetch('/chat/stream', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
           body: JSON.stringify({ query, history: historyToSend }),
         });
 
-        const data = await response.json();
+        if (!response.ok || !response.body) {
+          throw new Error('Streaming request failed');
+        }
 
-        // Remove the thinking state bubble
-        thinkingBubble.remove();
+        await parseSSEStream(response, {
+          meta: (data) => {
+            try {
+              streamedMetadata = JSON.parse(data);
+            } catch (error) {
+              console.error('Failed to parse stream metadata:', error);
+            }
+          },
+          chunk: (data) => {
+            try {
+              const payload = JSON.parse(data);
+              if (!streamStarted) {
+                streamStarted = true;
+                assistantBubble.innerHTML = '';
+              }
+              streamedText = `${streamedText} ${payload.text || ''}`.trim();
+              assistantBubble.innerHTML = renderMarkdown(streamedText);
+              chatWindow.scrollTop = chatWindow.scrollHeight;
+            } catch (error) {
+              console.error('Failed to parse stream chunk:', error);
+            }
+          },
+          citations: (data) => {
+            try {
+              const payload = JSON.parse(data);
+              resources = Array.isArray(payload.resources) ? payload.resources : [];
+            } catch (error) {
+              console.error('Failed to parse stream citations:', error);
+            }
+          },
+          done: () => {}
+        });
 
-        if (response.ok && data.answer) {
-          // Add assistant bubble with full metadata pills
-          const bubbleWrapper = addBubble(data.answer, 'assistant', {
-            language: data.language,
-            emotion: data.emotion,
-            intent: data.intent
-          });
-          // Add expandable resources below response inside the bubble wrapper
-          addCitations(data.resources, bubbleWrapper);
-
-          // Add assistant response to history
-          chatHistory.push({ role: 'assistant', content: data.answer });
-        } else if (response.status === 401) {
-          showAuthOverlay();
-          setAuthMessage(data.detail || 'Your session expired. Please sign in again.', 'error');
+        if (streamedText) {
+          appendAssistantMetadata(assistantWrapper, streamedMetadata);
+          if (resources.length > 0) {
+            addCitations(resources, assistantWrapper);
+          }
+          chatHistory.push({ role: 'assistant', content: streamedText });
         } else {
-          chatHistory.pop(); // Remove failed user message from history
-          addBubble(data.detail || 'I am sorry, something went wrong. Please try again.', 'assistant');
+          thinkingBubble.remove();
+          chatHistory.pop();
+          addBubble('I am sorry, something went wrong. Please try again.', 'assistant');
         }
       } catch (error) {
         thinkingBubble.remove();
-        chatHistory.pop(); // Remove failed user message from history
+        chatHistory.pop();
         addBubble('Unable to reach the server. Please check your connection and try again.', 'assistant');
+      } finally {
+        sendBtn.disabled = false;
       }
     });
 
-    checkExistingSession();
+    const micBtn = document.getElementById('mic-btn');
+    let mediaRecorder = null;
+    let audioChunks = [];
+    let isRecording = false;
+
+    // Web Audio API variables for silence detection
+    let audioContext = null;
+    let analyser = null;
+    let streamSource = null;
+    let checkSilenceInterval = null;
+
+    const SILENCE_THRESHOLD = 0.015; // Silence volume threshold (RMS)
+    const SILENCE_DURATION = 2000;   // Auto stop after 2000ms of silence
+
+    const stopRecording = () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micBtn.title = 'Record Voice';
+      cleanupAudioContext();
+    };
+
+    const cleanupAudioContext = () => {
+      if (checkSilenceInterval) {
+        clearInterval(checkSilenceInterval);
+        checkSilenceInterval = null;
+      }
+      if (audioContext) {
+        audioContext.close();
+        audioContext = null;
+      }
+      analyser = null;
+      streamSource = null;
+    };
+
+    micBtn.addEventListener('click', async () => {
+      if (!isRecording) {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          alert('Voice recording is not supported in this browser.');
+          return;
+        }
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorder = new MediaRecorder(stream);
+          audioChunks = [];
+
+          // Setup Web Audio Analyzer for silence detection
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          analyser = audioContext.createAnalyser();
+          analyser.fftSize = 512;
+          streamSource = audioContext.createMediaStreamSource(stream);
+          streamSource.connect(analyser);
+
+          const bufferLength = analyser.frequencyBinCount;
+          const dataArray = new Float32Array(bufferLength);
+          let silenceStart = null;
+
+          checkSilenceInterval = setInterval(() => {
+            if (!isRecording || !analyser) return;
+
+            analyser.getFloatTimeDomainData(dataArray);
+
+            // Compute volume level using Root Mean Square (RMS)
+            let sumSquares = 0.0;
+            for (let i = 0; i < dataArray.length; i++) {
+              sumSquares += dataArray[i] * dataArray[i];
+            }
+            const rms = Math.sqrt(sumSquares / dataArray.length);
+
+            if (rms < SILENCE_THRESHOLD) {
+              if (silenceStart === null) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart > SILENCE_DURATION) {
+                console.log("Silence threshold met, auto-stopping recording...");
+                stopRecording();
+              }
+            } else {
+              silenceStart = null; // voice activity detected, reset silence timer
+            }
+          }, 100);
+
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
+
+          mediaRecorder.onstop = async () => {
+            stream.getTracks().forEach(track => track.stop());
+            cleanupAudioContext();
+
+            const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+            const originalPlaceholder = queryInput.placeholder;
+            queryInput.placeholder = 'Transcribing voice...';
+            queryInput.disabled = true;
+            micBtn.disabled = true;
+
+            const formData = new FormData();
+            formData.append('file', audioBlob, 'recording.wav');
+
+            try {
+              const response = await fetch('/transcribe', {
+                method: 'POST',
+                body: formData,
+              });
+
+              if (!response.ok) {
+                throw new Error('Transcription failed');
+              }
+
+              const data = await response.json();
+              if (data.text) {
+                queryInput.value = data.text;
+                queryInput.style.height = 'auto';
+                queryInput.style.height = (queryInput.scrollHeight) + 'px';
+                // Auto-submit transcription to chat form
+                chatForm.requestSubmit();
+              }
+            } catch (err) {
+              console.error('Transcription error:', err);
+              alert('Could not transcribe audio. Please try again.');
+            } finally {
+              queryInput.placeholder = originalPlaceholder;
+              queryInput.disabled = false;
+              micBtn.disabled = false;
+              queryInput.focus();
+            }
+          };
+
+          mediaRecorder.start();
+          isRecording = true;
+          micBtn.classList.add('recording');
+          micBtn.title = 'Stop Recording';
+          queryInput.placeholder = 'Listening... Speak clearly. Auto-stops on silence.';
+        } catch (err) {
+          console.error('Error starting audio recording:', err);
+          alert('Could not access microphone. Please check permissions.');
+          cleanupAudioContext();
+        }
+      } else {
+        stopRecording();
+      }
+    });
+
+    loadChatHistory();
   </script>
+  {% endif %}
 </body>
 
 </html>

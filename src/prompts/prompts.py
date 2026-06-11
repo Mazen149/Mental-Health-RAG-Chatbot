@@ -1,4 +1,5 @@
 import dspy
+from pathlib import Path
 
 # ==============================================================================
 # INTENT CLASSIFIER PROMPTS
@@ -26,6 +27,13 @@ class IntentClassifierModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.classify = dspy.Predict(IntentClassifierSignature)
+        
+        optimized_path = Path("artifacts/dspy optimized prompts/intent_classifier_optimized.json")
+        if optimized_path.exists():
+            try:
+                self.load(str(optimized_path))
+            except Exception:
+                pass
 
     def forward(self, text: str) -> dict:
         pred = self.classify(text=text)
@@ -69,6 +77,13 @@ class RetrievalRouterModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.route_predict = dspy.Predict(RetrievalRouterSignature)
+        
+        optimized_path = Path("artifacts/dspy optimized prompts/router_optimized.json")
+        if optimized_path.exists():
+            try:
+                self.load(str(optimized_path))
+            except Exception:
+                pass
 
     def forward(self, chat_history: str, user_query: str) -> str:
         res = self.route_predict(chat_history=chat_history, user_query=user_query)
@@ -93,6 +108,13 @@ class QueryCondenserModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.condense = dspy.Predict(QueryCondenserSignature)
+        
+        optimized_path = Path("artifacts/dspy optimized prompts/condenser_optimized.json")
+        if optimized_path.exists():
+            try:
+                self.load(str(optimized_path))
+            except Exception:
+                pass
 
     def forward(self, chat_history: str, user_query: str) -> str:
         res = self.condense(chat_history=chat_history, user_query=user_query)
@@ -132,6 +154,13 @@ class GroundedResponseModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.generate = dspy.ChainOfThought(GroundedResponseSignature)
+        
+        optimized_path = Path("artifacts/dspy optimized prompts/grounded_response_optimized.json")
+        if optimized_path.exists():
+            try:
+                self.load(str(optimized_path))
+            except Exception:
+                pass
 
     def forward(self, contexts: str, emotions: str, language: str, chat_history: str, user_query: str) -> str:
         res = self.generate(
@@ -164,6 +193,13 @@ class GeneralConversationModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.respond = dspy.Predict(GeneralConversationSignature)
+        
+        optimized_path = Path("artifacts/dspy optimized prompts/general_conversation_optimized.json")
+        if optimized_path.exists():
+            try:
+                self.load(str(optimized_path))
+            except Exception:
+                pass
 
     def forward(self, language: str, chat_history: str, user_query: str) -> str:
         res = self.respond(language=language, chat_history=chat_history, user_query=user_query)

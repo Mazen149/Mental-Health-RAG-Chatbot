@@ -39,6 +39,7 @@ dependencies = [
     "coverage>=7.14.1",
     "langsmith>=0.8.9",
     "dspy>=3.2.1",
+    "python-multipart>=0.0.9",
 ]
 
 [build-system]

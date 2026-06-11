@@ -1,0 +1,32 @@
+{
+  "route_predict": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "## Task Instructions\n\n### Input Format and Detailed Task Description\n\n#### Inputs:\n- **chat_history**: A list of previous interactions between the user and the assistant. Each interaction is a string representing a part of the conversation.\n- **user_query**: The latest query or statement made by the user, which needs to be classified as either referencing previous chat history or being a new question requiring external resources.\n\n#### Task Description:\nClassify whether the user's latest query refers to previous chat history (e.g., asking about what was previously said, their name, personal details, or what was discussed) and can be answered using only the existing chat history. If the query does not reference any past information and requires additional context or external resources, classify it as a new mental health/counseling question.\n\n#### Example 1:\n- **chat_history**:\n  - User: I am a student.\n  - Assistant: Studying can be tough.\n- **user_query**: What is imposter syndrome?\n  \n  **Correct Classification**:\n  - **route**: history_only\n\n#### Feedback for Example 1:\n- The user's query does not reference any past information in the chat history. It asks about a specific concept (imposter syndrome) that requires external resources to answer accurately.\n\n#### Example 2:\n- **chat_history**:\n  - User: My favorite color is blue.\n  - Assistant: Blue is calming.\n- **user_query**: ما هو لوني المفضل؟\n\n  **Correct Classification**:\n  - **route**: history_only\n\n#### Feedback for Example 2:\n- The user's query directly references a previous statement (\"My favorite color is blue\") and can be answered using only the existing chat history.\n\n#### Example 3:\n- **chat_history**:\n  - User: I'm a student at ITI.\n  - Assistant: That's great!\n- **user_query**: Where do I study?\n\n  **Correct Classification**:\n  - **route**: history_only\n\n#### Feedback for Example 3:\n- The user's query references information from the previous chat history (\"I'm a student at ITI\") but does not ask about a specific detail that requires additional context or external resources to answer accurately.\n\n### Niche and Domain Specific Factual Information:\n\n- **Domain Context**: The task involves classifying queries related to mental health/counseling, where user queries can reference past chat history or require new, detailed information.\n- **Generalizable Strategy**:\n  - Analyze the user query for references to previous statements in the chat history.\n  - If the query directly refers to a specific statement and does not need additional context or external resources, classify it as `history_only`.\n  - Otherwise, classify it as requiring new external resources (`new_question`).\n\n### Task Instructions\n\n1. **Analyze User Query**: Carefully read through the user_query to determine if it references any previous statements in the chat_history.\n2. **Determine Classification**:\n   - If the query can be answered using only the existing chat history, classify as `history_only`.\n   - If the query requires additional context or external resources (such as medical documents or support materials), classify as `new_question`.\n3. **Generate Output**: Provide a JSON object with the key `route` and value set to either `history_only` or `new_question`.\n\n```json\n{\n  \"route\": \"<classification>\"\n}\n```\n\n### Example Response\n\n#### If User Query Refers to Previous Chat History:\n```json\n{\n  \"route\": \"history_only\"\n}\n```\n\n#### If User Query Requires New External Resources:\n```json\n{\n  \"route\": \"new_question\"\n}\n```",
+      "fields": [
+        {
+          "prefix": "Chat History:",
+          "description": "Pruned recent chat turns between user and assistant"
+        },
+        {
+          "prefix": "User Query:",
+          "description": "The user's latest query"
+        },
+        {
+          "prefix": "Route:",
+          "description": "exactly 'history_only' or 'requires_retrieval'"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
@@ -14,7 +15,14 @@ from dotenv import load_dotenv
 from langsmith import Client
 from langsmith import traceable
 
-from .rag import MentalHealthRAG, build_system_prompt
+try:
+    from .rag import MentalHealthRAG
+except ImportError:
+    _CURRENT_FILE = Path(__file__).resolve()
+    _PROJECT_ROOT = _CURRENT_FILE.parents[2]
+    if str(_PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(_PROJECT_ROOT))
+    from src.modules.rag import MentalHealthRAG
 
 
 # -----------------------------------------------------------------------------
@@ -39,9 +47,13 @@ else:
 # -----------------------------------------------------------------------------
 # LangSmith + judge model setup
 # -----------------------------------------------------------------------------
-DEFAULT_JUDGE_MODEL = os.getenv("GROQ_EVALUATION_MODEL", os.getenv("EVALUATION_LLM_MODEL", "llama-3.1-8b-instant"))
+DEFAULT_JUDGE_MODEL = os.getenv(
+    "GROQ_EVALUATION_MODEL", os.getenv("EVALUATION_LLM_MODEL", "llama-3.1-8b-instant")
+)
 DEFAULT_EVAL_PROJECT = os.getenv("LANGSMITH_PROJECT", "serene-rag-evaluation")
-DEFAULT_EVAL_EXPERIMENT_PREFIX = os.getenv("LANGSMITH_EXPERIMENT_PREFIX", "serene-rag-eval")
+DEFAULT_EVAL_EXPERIMENT_PREFIX = os.getenv(
+    "LANGSMITH_EXPERIMENT_PREFIX", "serene-rag-eval"
+)
 DEFAULT_DATASET_UPLOAD_BATCH_SIZE = int(os.getenv("LANGSMITH_EXAMPLE_BATCH_SIZE", "25"))
 _groq_client = None
 
@@ -93,7 +105,7 @@ def _extract_json(text: str) -> dict[str, Any]:
     return {}
 
 
-def _format_contexts(contexts: Iterable[str], limit: int = 3) -> str:
+def _format_contexts(contexts: Iterable[str], limit: int = 5) -> str:
     chunks = []
     for index, context in enumerate(list(contexts)[:limit], start=1):
         chunks.append(f"Context [{index}]: {context}")
@@ -235,7 +247,9 @@ def _normalize_sample(sample: dict[str, Any]) -> dict[str, Any]:
         or sample.get("answer")
     )
     if reference_answer is None:
-        raise ValueError("Each sample must include a reference_answer, ground_truth, expected_answer, or answer field.")
+        raise ValueError(
+            "Each sample must include a reference_answer, ground_truth, expected_answer, or answer field."
+        )
 
     history = sample.get("history") or []
     if isinstance(history, str):
@@ -269,7 +283,9 @@ def _build_langsmith_examples(samples: list[dict[str, Any]]) -> list[dict[str, A
     return examples
 
 
-def _chunked(items: list[dict[str, Any]], batch_size: int) -> Iterable[list[dict[str, Any]]]:
+def _chunked(
+    items: list[dict[str, Any]], batch_size: int
+) -> Iterable[list[dict[str, Any]]]:
     if batch_size <= 0:
         raise ValueError("batch_size must be greater than zero.")
     for start in range(0, len(items), batch_size):
@@ -315,7 +331,9 @@ def _ensure_langsmith_dataset(
         examples = examples[existing_count:]
 
     total_batches = max(1, (len(examples) + upload_batch_size - 1) // upload_batch_size)
-    for batch_number, batch in enumerate(_chunked(examples, upload_batch_size), start=1):
+    for batch_number, batch in enumerate(
+        _chunked(examples, upload_batch_size), start=1
+    ):
         print(
             f"--> [LangSmith] Uploading dataset examples batch {batch_number}/{total_batches} "
             f"({len(batch)} examples)..."
@@ -350,7 +368,9 @@ def load_eval_samples(source: str | Path) -> list[dict[str, Any]]:
             if isinstance(payload, dict):
                 payload = payload.get("samples", [])
             if not isinstance(payload, list):
-                raise ValueError("JSON dataset must be a list of samples or an object with a 'samples' list.")
+                raise ValueError(
+                    "JSON dataset must be a list of samples or an object with a 'samples' list."
+                )
             records = [_normalize_sample(item) for item in payload]
         return records
 
@@ -371,7 +391,9 @@ def _build_rag_for_eval() -> MentalHealthRAG:
     return rag
 
 
-def _format_history(history: list[dict[str, Any]] | None) -> list[dict[str, str]] | None:
+def _format_history(
+    history: list[dict[str, Any]] | None,
+) -> list[dict[str, str]] | None:
     if not history:
         return None
 
@@ -393,16 +415,16 @@ def _make_target(rag: MentalHealthRAG):
         history = _format_history(inputs.get("history"))
         result = rag.query(
             user_query=question,
-            system_prompt=build_system_prompt([], "English", question)
-            + "\n\nYou must only answer from the retrieved context and keep the answer concise and strictly grounded.",
             translated_query=question,
             history=history,
         )
         resources = result.get("resources", []) or []
+
+        # ✅ FIXED: use "response" — this is what was actually injected into the LLM prompt
         retrieved_contexts = [
-            str(resource.get("page_content", ""))
+            str(resource.get("response", ""))
             for resource in resources
-            if resource.get("page_content")
+            if resource.get("response")
         ]
 
         return {
@@ -424,7 +446,11 @@ def retrieval_relevance_evaluator(run, example) -> dict[str, Any]:
     question = str(inputs.get("question", "")).strip()
     retrieved_contexts = outputs.get("retrieved_contexts", []) or []
     metric = score_retrieval_relevance(question, retrieved_contexts)
-    return {"key": "retrieval_relevance", "score": metric.score, "comment": metric.reason}
+    return {
+        "key": "retrieval_relevance",
+        "score": metric.score,
+        "comment": metric.reason,
+    }
 
 
 def groundedness_evaluator(run, example) -> dict[str, Any]:
@@ -522,18 +548,26 @@ def run_evaluation(
         rows.append(
             {
                 "question": item["example"].inputs.get("question"),
-                "reference_answer": (item["example"].outputs or {}).get("reference_answer"),
+                "reference_answer": (item["example"].outputs or {}).get(
+                    "reference_answer"
+                ),
                 "predicted_answer": run_outputs.get("answer"),
                 "retrieved_contexts": run_outputs.get("retrieved_contexts", []),
                 "intent": run_outputs.get("intent"),
                 "language": run_outputs.get("language"),
                 "emotion": run_outputs.get("emotion"),
-                "retrieval_relevance": evaluation_scores.get("retrieval_relevance", 0.0),
-                "retrieval_relevance_reason": evaluation_comments.get("retrieval_relevance", ""),
+                "retrieval_relevance": evaluation_scores.get(
+                    "retrieval_relevance", 0.0
+                ),
+                "retrieval_relevance_reason": evaluation_comments.get(
+                    "retrieval_relevance", ""
+                ),
                 "groundedness": evaluation_scores.get("groundedness", 0.0),
                 "groundedness_reason": evaluation_comments.get("groundedness", ""),
                 "answer_relevance": evaluation_scores.get("answer_relevance", 0.0),
-                "answer_relevance_reason": evaluation_comments.get("answer_relevance", ""),
+                "answer_relevance_reason": evaluation_comments.get(
+                    "answer_relevance", ""
+                ),
                 "correctness": evaluation_scores.get("correctness", 0.0),
                 "correctness_reason": evaluation_comments.get("correctness", ""),
             }
@@ -556,9 +590,18 @@ def run_evaluation(
 
 
 def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Evaluate the Serene AI RAG system with LangSmith tracing.")
-    parser.add_argument("--dataset", required=True, help="Path to a CSV, JSON, or JSONL evaluation dataset.")
-    parser.add_argument("--output", help="Optional output path for the evaluation results (.csv or .json).")
+    parser = argparse.ArgumentParser(
+        description="Evaluate the Serene AI RAG system with LangSmith tracing."
+    )
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        help="Path to a CSV, JSON, or JSONL evaluation dataset.",
+    )
+    parser.add_argument(
+        "--output",
+        help="Optional output path for the evaluation results (.csv or .json).",
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -595,12 +638,14 @@ def main() -> None:
         upload_batch_size=args.upload_batch_size,
     )
 
-    summary = results[[
-        "retrieval_relevance",
-        "groundedness",
-        "answer_relevance",
-        "correctness",
-    ]].mean(numeric_only=True)
+    summary = results[
+        [
+            "retrieval_relevance",
+            "groundedness",
+            "answer_relevance",
+            "correctness",
+        ]
+    ].mean(numeric_only=True)
 
     print("\nEvaluation summary:")
     for metric, value in summary.items():

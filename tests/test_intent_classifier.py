@@ -115,3 +115,31 @@ def test_convenience_function():
         mock_inst.classify.return_value = Intent(type="greeting", confidence=0.9, classifier="embedding")
         res = classify_intent("hi")
         assert res.type == "greeting"
+
+
+def test_intent_classifier_crisis_embedding_high_confidence():
+    """Verify that a crisis intent with score >= 0.85 is returned immediately from embedding."""
+    classifier = IntentClassifier()
+    with patch.object(classifier, "_embedding_classifier") as mock_embed:
+        mock_embed.return_value = Intent(type="crisis", confidence=0.88, classifier="embedding")
+        res = classifier.classify("I want to end my life")
+        assert res.type == "crisis"
+        assert res.confidence == 0.88
+        assert res.classifier == "embedding"
+
+
+def test_intent_classifier_crisis_embedding_low_confidence():
+    """Verify that a crisis intent with score < 0.85 falls back to LLM classifier."""
+    classifier = IntentClassifier()
+    with patch.object(classifier, "_embedding_classifier") as mock_embed:
+        mock_embed.return_value = Intent(type="crisis", confidence=0.75, classifier="embedding")
+        mock_fallback = MagicMock()
+        mock_fallback.return_value = Intent(type="crisis", confidence=0.98, classifier="llm")
+        classifier.llm_fallback = mock_fallback
+        
+        res = classifier.classify("I want to end my life")
+        assert res.type == "crisis"
+        assert res.confidence == 0.98
+        assert res.classifier == "llm"
+        mock_fallback.assert_called_once_with("I want to end my life")
+

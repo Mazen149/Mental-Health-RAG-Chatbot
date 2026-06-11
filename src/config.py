@@ -21,9 +21,10 @@ class Config:
 
     ENV_PATH = PROJECT_ROOT / ".env"
     if ENV_PATH.exists():
-        load_dotenv(dotenv_path=ENV_PATH)
+        load_dotenv(dotenv_path=ENV_PATH, override=True)
     else:
-        load_dotenv()
+        load_dotenv(override=True)
+
 
     # ------------------------------------------------------------------------------
     # 2. Derived File & Directory Paths (Cross-Platform)
@@ -63,6 +64,12 @@ class Config:
     QDRANT_URL = os.getenv("QDRANT_URL")
     QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")
+
+    # ------------------------------------------------------------------------------
+    # 6. Demo Authentication
+    # ------------------------------------------------------------------------------
+    SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-change-me")
+    CHAT_DATABASE_PATH = ARTIFACTS_DIR / "chat_interactions.sqlite3"
 
 # Expose a singleton instance
 config = Config()

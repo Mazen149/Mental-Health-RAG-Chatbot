@@ -1,0 +1,32 @@
+{
+  "condense": {
+    "traces": [],
+    "train": [],
+    "demos": [],
+    "signature": {
+      "instructions": "Given a chat history and the latest user question which might reference context in the chat history,\nformulate a standalone question which can be understood without the chat history.\nThe standalone question MUST be written in English. Do NOT answer the question, just reformulate it\nand output ONLY the standalone question.",
+      "fields": [
+        {
+          "prefix": "Chat History:",
+          "description": "Recent chat turns between user and assistant"
+        },
+        {
+          "prefix": "User Query:",
+          "description": "The latest user question/query"
+        },
+        {
+          "prefix": "Condensed Query:",
+          "description": "A standalone question in English representing the query in history context"
+        }
+      ]
+    },
+    "lm": null
+  },
+  "metadata": {
+    "dependency_versions": {
+      "python": "3.12",
+      "dspy": "3.2.1",
+      "cloudpickle": "3.1"
+    }
+  }
+}

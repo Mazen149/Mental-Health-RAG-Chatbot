@@ -29,11 +29,12 @@ class IntentClassifierModule(dspy.Module):
         self.classify = dspy.Predict(IntentClassifierSignature)
         
         optimized_path = Path("artifacts/dspy optimized prompts/intent_classifier_optimized.json")
-        if optimized_path.exists():
-            try:
-                self.load(str(optimized_path))
-            except Exception:
-                pass
+        # Reverted back to baseline unoptimized system prompts
+        # if optimized_path.exists():
+        #     try:
+        #         self.load(str(optimized_path))
+        #     except Exception:
+        #         pass
 
     def forward(self, text: str) -> dict:
         pred = self.classify(text=text)
@@ -79,11 +80,12 @@ class RetrievalRouterModule(dspy.Module):
         self.route_predict = dspy.Predict(RetrievalRouterSignature)
         
         optimized_path = Path("artifacts/dspy optimized prompts/router_optimized.json")
-        if optimized_path.exists():
-            try:
-                self.load(str(optimized_path))
-            except Exception:
-                pass
+        # Reverted back to baseline unoptimized system prompts
+        # if optimized_path.exists():
+        #     try:
+        #         self.load(str(optimized_path))
+        #     except Exception:
+        #         pass
 
     def forward(self, chat_history: str, user_query: str) -> str:
         res = self.route_predict(chat_history=chat_history, user_query=user_query)
@@ -110,11 +112,12 @@ class QueryCondenserModule(dspy.Module):
         self.condense = dspy.Predict(QueryCondenserSignature)
         
         optimized_path = Path("artifacts/dspy optimized prompts/condenser_optimized.json")
-        if optimized_path.exists():
-            try:
-                self.load(str(optimized_path))
-            except Exception:
-                pass
+        # Reverted back to baseline unoptimized system prompts
+        # if optimized_path.exists():
+        #     try:
+        #         self.load(str(optimized_path))
+        #     except Exception:
+        #         pass
 
     def forward(self, chat_history: str, user_query: str) -> str:
         res = self.condense(chat_history=chat_history, user_query=user_query)
@@ -124,20 +127,22 @@ class QueryCondenserModule(dspy.Module):
 class GroundedResponseSignature(dspy.Signature):
     """You are a compassionate, professional mental health support assistant.
     Your goal is to provide a supportive, empathetic, and conversational response to the user's query.
-    
+
     CRITICAL GROUNDING RULES:
     - Ground your response and advice in the retrieved contexts. You should also refer to personal facts, context, or situations mentioned in the chat history.
-    - If neither the retrieved contexts nor the chat history contain enough information to address the query, respond exactly with: 'I'm sorry, I don't have enough information to answer that.' (or its translation in the user's language).
-    - Strictly avoid inventing therapy techniques, clinical diagnoses, or medication names. Do not hallucinate.
-    
+    - If the retrieved contexts do not contain sufficient specific counseling details or if the query is a general emotional expression/mental health concern (e.g. "i feel depressed", "i am sad", etc.) where the contexts lack a direct answer, DO NOT respond with a dry fallback like "I'm sorry, I don't have enough information to answer that."
+      Instead, provide a warm, empathetic validation of the user's feelings, suggest standard gentle self-care tips (e.g. taking a short walk, practicing deep breathing, resting, or talking to someone), and ask a gentle, open-ended follow-up question to encourage the user to share more (e.g., "Would you like to share a bit more about what's making you feel this way?" or "How can I support you best right now?").
+    - Only use the fallback message "I'm sorry, I don't have enough information to answer that." (translated to the user's language) if the query is completely off-topic or out of scope (unrelated to mental health, counseling, emotions, or identity).
+
     CRITICAL LANGUAGE RULES:
     - Respond in the language that the query is ACTUALLY written in.
     - If the contexts are in a different language, translate the relevant information from those contexts into the user's language.
-    
+
     RESPONSE FORMAT:
     - Keep your response concise, to exactly 3-5 sentences.
     - Do not use bullet points or numbered lists.
-    - Cite the retrieved contexts by appending the context number in square brackets, e.g. [1], [2], or [3] (corresponding to Context [1], Context [2], or Context [3]). Do not create other citations.
+    - Cite the retrieved contexts by appending ONLY the bracketed number (e.g., [1], [2], or [3]) at the end of the sentence or clause where you use the context details.
+    - You MUST NEVER say things like 'as it is in Context [1]', 'echoed in Context [2]', 'grounding 1', 'grounding 2', 'counseling case', or similar. Simply state the advice directly and append the bracketed number at the end of the sentence (e.g., 'A self-care routine can help lift your mood [3].'). Do not explicitly mention the context, grounding, database, or case sources in your text. If no context details are used, do not include citations.
     - Adjust tone implicitly according to the user's emotions and directives. Do not label their emotions explicitly.
     """
 
@@ -156,11 +161,12 @@ class GroundedResponseModule(dspy.Module):
         self.generate = dspy.ChainOfThought(GroundedResponseSignature)
         
         optimized_path = Path("artifacts/dspy optimized prompts/grounded_response_optimized.json")
-        if optimized_path.exists():
-            try:
-                self.load(str(optimized_path))
-            except Exception:
-                pass
+        # Reverted back to baseline unoptimized system prompts
+        # if optimized_path.exists():
+        #     try:
+        #         self.load(str(optimized_path))
+        #     except Exception:
+        #         pass
 
     def forward(self, contexts: str, emotions: str, language: str, chat_history: str, user_query: str) -> str:
         res = self.generate(
@@ -195,11 +201,12 @@ class GeneralConversationModule(dspy.Module):
         self.respond = dspy.Predict(GeneralConversationSignature)
         
         optimized_path = Path("artifacts/dspy optimized prompts/general_conversation_optimized.json")
-        if optimized_path.exists():
-            try:
-                self.load(str(optimized_path))
-            except Exception:
-                pass
+        # Reverted back to baseline unoptimized system prompts
+        # if optimized_path.exists():
+        #     try:
+        #         self.load(str(optimized_path))
+        #     except Exception:
+        #         pass
 
     def forward(self, language: str, chat_history: str, user_query: str) -> str:
         res = self.respond(language=language, chat_history=chat_history, user_query=user_query)

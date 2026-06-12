@@ -180,7 +180,30 @@
     <footer class="app-footer">
       <p>⚠️ <strong>Crisis Notice:</strong> If you are in immediate danger, please reach out to local emergency services
         or contact a national crisis hotline.</p>
-    </footer>
+  </div>
+
+  <!-- Modal Overlay for Interactive Sources -->
+  <div id="source-modal" class="source-modal-overlay" onclick="closeSourceModal()">
+    <div class="source-modal-content" onclick="event.stopPropagation()">
+      <div class="source-modal-header">
+        <h3 id="modal-source-title">Ref #MHC-1</h3>
+        <button class="source-modal-close" onclick="closeSourceModal()">&times;</button>
+      </div>
+      <div class="source-modal-body">
+        <div class="modal-section">
+          <div class="modal-section-title">Match Relevance</div>
+          <div id="modal-source-score" class="citation-score">0% Match</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title">📄 Counseling Case / Context</div>
+          <div id="modal-source-context" class="modal-source-text"></div>
+        </div>
+        <div class="modal-section" id="modal-response-section">
+          <div class="modal-section-title">🧑‍⚕️ Clinical Advice / Response</div>
+          <div id="modal-source-response" class="modal-source-text response-style"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
@@ -193,6 +216,42 @@
     const queryInput = document.getElementById('query');
     const sendBtn = document.getElementById('send-btn');
     const clearBtn = document.getElementById('clear-btn');
+
+    // Interactive Modal Controller
+    const sourceModal = document.getElementById('source-modal');
+    const modalTitle = document.getElementById('modal-source-title');
+    const modalScore = document.getElementById('modal-source-score');
+    const modalContext = document.getElementById('modal-source-context');
+    const modalResponse = document.getElementById('modal-source-response');
+    const modalResponseSection = document.getElementById('modal-response-section');
+
+    window.showSourceModal = (title, scoreLabel, scoreClass, contextText, responseText) => {
+      modalTitle.textContent = title;
+      modalScore.textContent = scoreLabel;
+      modalScore.className = `citation-score ${scoreClass}`;
+      modalContext.textContent = contextText;
+      if (responseText) {
+        modalResponse.textContent = responseText;
+        modalResponseSection.style.display = 'flex';
+      } else {
+        modalResponseSection.style.display = 'none';
+      }
+      sourceModal.style.display = 'flex';
+    };
+
+    window.closeSourceModal = () => {
+      sourceModal.style.display = 'none';
+    };
+
+    const formatCitations = (text) => {
+      let formattedText = text || '';
+      // Replace "Context [N]" or "[Context N]" or just "[N]" with the interactive badge
+      formattedText = formattedText.replace(/(?:Context\s*)?\[(\d+)\]/gi, (match, num) => {
+        return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
+      });
+      return formattedText;
+    };
+
     const chatHistory = [];
 
     clearBtn.addEventListener('click', async () => {
@@ -336,11 +395,7 @@
               </div>
             `;
         } else {
-          let formattedText = text || '';
-          formattedText = formattedText.replace(/\[(\d+)\]/g, (match, num) => {
-            return `<span class="inline-citation" onclick="highlightSource(event, ${num})">${num}</span>`;
-          });
-          bubble.innerHTML = renderMarkdown(formattedText);
+          bubble.innerHTML = renderMarkdown(formatCitations(text));
         }
       } else {
         bubble.textContent = text;
@@ -439,6 +494,9 @@
     const addCitations = (resources, parentWrapper) => {
       if (!Array.isArray(resources) || resources.length === 0) return;
 
+      // Store raw resources array on wrapper for inline citation modal pop-ups
+      parentWrapper.dataset.resources = JSON.stringify(resources);
+
       const contentArea = parentWrapper.querySelector('.bubble-content-area');
       if (!contentArea) return;
 
@@ -495,17 +553,23 @@
               </span>
               <span class="citation-score ${scoreClass}">${scoreLabel}</span>
             </div>
-            <div class="citation-text-container">
+            <div class="input-container" style="pointer-events: none;">
               <div class="citation-section-title">📄 Counseling Case / Context:</div>
               <div class="citation-text">${safeSanitize(resource.page_content)}</div>
             </div>
             ${resource.response ? `
-              <div class="citation-response-preview">
+              <div class="citation-response-preview" style="pointer-events: none;">
                 <div class="citation-section-title">🧑‍⚕️ Clinical Advice / Response:</div>
                 <div class="citation-response-text">${safeSanitize(resource.response)}</div>
               </div>
             ` : ''}
           `;
+        
+        // Open the modal upon clicking the card
+        item.addEventListener('click', () => {
+          showSourceModal(titleText, scoreLabel, scoreClass, resource.page_content, resource.response);
+        });
+
         body.appendChild(item);
       });
 
@@ -585,21 +649,24 @@
       event.stopPropagation();
       const wrapper = event.target.closest('.bubble-wrapper');
       if (!wrapper) return;
-      const header = wrapper.querySelector('.citation-header');
-      const body = wrapper.querySelector('.citation-body');
-      if (header && body) {
-        if (body.classList.contains('collapsed')) {
-          body.classList.remove('collapsed');
-          header.classList.add('expanded');
+      try {
+        const resources = JSON.parse(wrapper.dataset.resources || '[]');
+        const resource = resources[index - 1];
+        if (resource) {
+          const score = resource.score ? resource.score : 0.0;
+          let scoreLabel = '';
+          let scoreClass = 'med';
+          if (score >= 0 && score <= 1.0) {
+            scoreLabel = `${(score * 100).toFixed(0)}% Match`;
+            if (score >= 0.7) scoreClass = 'high';
+          } else {
+            scoreLabel = `Score ${score.toFixed(1)}`;
+            if (score >= 2.0) scoreClass = 'high';
+          }
+          showSourceModal(`Ref #MHC-${index}`, scoreLabel, scoreClass, resource.page_content, resource.response);
         }
-        const items = body.querySelectorAll('.citation-item');
-        if (items.length >= index) {
-          const targetItem = items[index - 1];
-          targetItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          targetItem.classList.remove('highlight-pulse');
-          void targetItem.offsetWidth;
-          targetItem.classList.add('highlight-pulse');
-        }
+      } catch (err) {
+        console.error("Failed to parse resources for modal:", err);
       }
     };
 
@@ -650,7 +717,7 @@
                 assistantBubble.innerHTML = '';
               }
               streamedText = `${streamedText} ${payload.text || ''}`.trim();
-              assistantBubble.innerHTML = renderMarkdown(streamedText);
+              assistantBubble.innerHTML = renderMarkdown(formatCitations(streamedText));
               chatWindow.scrollTop = chatWindow.scrollHeight;
             } catch (error) {
               console.error('Failed to parse stream chunk:', error);
@@ -668,6 +735,7 @@
         });
 
         if (streamedText) {
+          assistantBubble.innerHTML = renderMarkdown(formatCitations(streamedText));
           appendAssistantMetadata(assistantWrapper, streamedMetadata);
           if (resources.length > 0) {
             addCitations(resources, assistantWrapper);

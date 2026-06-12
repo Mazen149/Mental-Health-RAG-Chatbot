@@ -94,7 +94,7 @@ class IntentClassifier:
             ],
         }
 
-        self.embedding_threshold = 0.65
+        self.embedding_threshold = 0.85
         self.embedding_model = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         
         hf_token = config.HF_TOKEN

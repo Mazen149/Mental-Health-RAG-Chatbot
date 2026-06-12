@@ -88,8 +88,8 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
     @patch('src.router.detect_language')
     @patch('src.router.classify_emotion')
     @patch('src.router.classify_intent')
-    async def test_short_non_greeting_padding(self, mock_intent, mock_emotion, mock_lang):
-        """Verify that short non-greeting queries are padded before language detection."""
+    async def test_short_non_greeting_no_padding(self, mock_intent, mock_emotion, mock_lang):
+        """Verify that short non-greeting queries are not padded before language detection."""
         mock_lang.return_value = "English"
         mock_emotion.return_value = ["Sadness"]
         mock_intent.return_value = "asking_mental_health_question"
@@ -99,12 +99,12 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
             "resources": []
         }
         
-        # Test case 1: small query (1 word) -> should be padded with /p word tokens
+        # Test case 1: small query (1 word) -> should not be padded
         query_short = "sad"
         await route_query(query_short, self.mock_rag)
-        mock_lang.assert_called_with("/p /p /p /p sad /p /p /p /p")
+        mock_lang.assert_called_with("sad")
         
-        # Test case 2: long query (6 words) -> should NOT be padded
+        # Test case 2: long query (6 words) -> should not be padded
         mock_lang.reset_mock()
         query_long = "I feel extremely sad and hopeless"
         await route_query(query_long, self.mock_rag)

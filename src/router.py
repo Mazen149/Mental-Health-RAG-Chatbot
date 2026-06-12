@@ -136,14 +136,9 @@ async def route_query(query: str, rag_instance, history: list = None) -> dict:
     # =============================================
     # 0. LANGUAGE & CRISIS PRE-DETECTION (takes < 1ms locally)
     # =============================================
-    query_words = query.strip().split()
-    query_for_lang = query
-    if len(query_words) < 5:
-        query_for_lang = f"/p /p /p /p {query.strip()} /p /p /p /p" # Pad short queries to improve language detection accuracy with more context
-    
     try:
         # Run local TF-IDF model synchronously (takes <1ms)
-        language = detect_language(query_for_lang)
+        language = detect_language(query)
     except Exception as e:
         safe_print(f"Error in local language detection: {e}")
         language = "English"

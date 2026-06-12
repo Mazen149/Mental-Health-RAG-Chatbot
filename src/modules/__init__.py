@@ -13,7 +13,7 @@ _emotion_classifier = None
 _intent_classifier = None
 
 
-def detect_language(text: str) -> str:
+def detect_language(text: str, threshold: float = 0.85) -> str:
     """
     Detects language and returns the full name of the language (e.g. 'English').
     Compatible with router.py.
@@ -21,7 +21,7 @@ def detect_language(text: str) -> str:
     global _language_detector
     if _language_detector is None:
         _language_detector = LanguageDetector()
-    res = _language_detector.detect(text)
+    res = _language_detector.detect(text, threshold=threshold)
     return res.get("language_name", "English")
 
 

@@ -539,7 +539,11 @@ class MentalHealthRAG:
                 )
         except Exception as e:
             print(f"Error during grounded response generation: {e}")
-            answer = "I'm sorry, I don't have enough information to answer that."
+            err_str = str(e).lower()
+            if "429" in err_str or "rate limit" in err_str or "too many requests" in err_str or "token" in err_str or "quota" in err_str:
+                answer = "The token limit has been reached. Please wait a moment before trying again."
+            else:
+                answer = "I'm sorry, I don't have enough information to answer that."
 
         # Safety Fallback: Ensure crisis response is appended if crisis query is detected
         if detect_crisis(user_query):
@@ -581,6 +585,9 @@ class MentalHealthRAG:
             return answer
         except Exception as e:
             print(f"Error during general query generation: {e}")
+            err_str = str(e).lower()
+            if "429" in err_str or "rate limit" in err_str or "too many requests" in err_str or "token" in err_str or "quota" in err_str:
+                return "The token limit has been reached. Please wait a moment before trying again."
             return "Hello! I am here to support you with mental health topics. 😊"
 
     def close(self) -> None:

@@ -32,8 +32,7 @@ The chatbot employs a multi-layered classification, routing, and retrieval pipel
 
 ```mermaid
 graph TD
-    UserQuery([User Query / Whisper STT]) --> PadShortQuery["Pad short query (if < 5 words)"]
-    PadShortQuery --> LangDetect["Language Detection: TF-IDF + Logistic Regression"]
+    UserQuery([User Query / Whisper STT]) --> LangDetect["Language Detection"]
     LangDetect --> Layer1Router{"Layer 1: Regex Fast-Path?"}
     
     %% Direct Responses
@@ -104,16 +103,17 @@ graph TD
 *   **📚 Chunked RAG Data Pipeline**:
     *   Groups clinician responses by unique normalized questions, merges them, and truncates to 750 words.
     *   Splits long merged responses into optimized chunks using `RecursiveCharacterTextSplitter` (chunk size = 500, overlap = 100) to find the most relevant portion, preventing context dilution and improving grounding precision.
-*   **🔍 Hybrid Retrieval & Local Reranking**:
+*   **🔍 Hybrid Retrieval & Interactive Grounding**:
     *   Retrieves the top relevant mental health contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55).
     *   Applies **Cosine Similarity Scoring** locally using query embeddings to precisely filter the top 3 most relevant contexts without relying on external APIs.
+    *   Features an **Interactive Citations Modal UI**: Clicking inline citation numbers (e.g. `1`) or Grounded Reference Cards pops up a detailed overlay displaying the clinical advice and counselor case context.
 *   **👁️ LangSmith Observability**:
     *   End-to-end tracing integrated across the pipeline (from Router logic to DSPy LLM generation) to monitor latency, track costs, and evaluate output quality in real-time.
 *   **💬 Optimized Rolling Conversation History**:
     *   Tracks conversation history on both the client (frontend UI) and server (backend payload).
     *   Prunes history dynamically to keep only the last 3 turns (last 6 messages) to maintain context and continuity while keeping the context window small, fast, and cost-effective.
 *   **🌐 Self-Correcting Multilingual Engine**:
-    *   Robust language detection using TF-IDF + Logistic Regression with custom padding heuristics for short queries.
+    *   Robust language detection to dynamically identify the user's language.
     *   Optional translation pipeline (`Helsinki-NLP/opus-mt-mul-en`) to translate queries before retrieval and enforce responses in the user's native language.
 *   **📈 Integrated Evaluation Suite**:
     *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, factual correctness, and context recall.

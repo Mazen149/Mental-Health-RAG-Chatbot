@@ -39,6 +39,7 @@ dependencies = [
     "langsmith>=0.8.9",
     "dspy>=3.2.1",
     "python-multipart>=0.0.9",
+    "fasttext-wheel>=0.9.2",
 ]
 
 [build-system]

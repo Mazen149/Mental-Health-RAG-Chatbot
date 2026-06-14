@@ -25,6 +25,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from starlette.middleware.sessions import SessionMiddleware
+from fastapi.middleware.cors import CORSMiddleware
 
 # ------------------------------------------------------------------------------
 # 1. Environment Loading & Configuration
@@ -242,6 +243,14 @@ app.add_middleware(
     https_only=False,
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 app.mount(
@@ -329,6 +338,27 @@ def _save_feedback(user_id: int | None, vote: str, user_message: str, bot_respon
             (user_id, vote, user_message, bot_response),
         )
         conn.commit()
+
+
+def _get_or_create_guest_user_id() -> int:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM users WHERE username = ?", ("guest",))
+        row = cursor.fetchone()
+        if row:
+            return int(row["id"])
+        # Create guest user
+        salt, pwhash = _hash_password("guest_pass_123_xyz")
+        cursor.execute(
+            """
+            INSERT INTO users (username, password_salt, password_hash)
+            VALUES (?, ?, ?)
+            """,
+            ("guest", salt, pwhash),
+        )
+        conn.commit()
+        return cursor.lastrowid
 
 
 def _db_connection() -> sqlite3.Connection:
@@ -699,8 +729,9 @@ async def clear_chat(request: Request) -> dict:
 @app.post("/chat", response_model=ChatResponse)
 async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
-    if not _is_authenticated(page_request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = page_request.session.get("user_id")
+    if user_id is None:
+        user_id = _get_or_create_guest_user_id()
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -708,10 +739,6 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
 
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
-
-    user_id = page_request.session.get("user_id")
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
 
     result: dict[str, Any] | None = None
     error_response: str | None = None
@@ -750,8 +777,9 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
 @app.post("/chat/stream")
 async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingResponse:
     """Streams the generated answer as SSE chunks after the RAG response is ready."""
-    if not _is_authenticated(page_request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = page_request.session.get("user_id")
+    if user_id is None:
+        user_id = _get_or_create_guest_user_id()
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -759,10 +787,6 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
 
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
-
-    user_id = page_request.session.get("user_id")
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
 
     try:
         result = await route_query(query_text, rag, history=request.history)
@@ -832,13 +856,12 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
 @app.post("/feedback")
 async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict:
     """Saves user thumbs up/down feedback on bot replies."""
-    if not _is_authenticated(page_request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
     if request.vote not in ("up", "down"):
         raise HTTPException(status_code=400, detail="Vote must be 'up' or 'down'.")
 
     user_id = page_request.session.get("user_id")
+    if user_id is None:
+        user_id = _get_or_create_guest_user_id()
     _save_feedback(
         user_id=int(user_id) if user_id is not None else None,
         vote=request.vote,

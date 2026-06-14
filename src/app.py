@@ -50,9 +50,13 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    query: str = Field(
-        ..., 
+    query: str | None = Field(
+        None, 
         description="The user's query or message to the mental health chatbot."
+    )
+    message: str | None = Field(
+        None,
+        description="Alternative field for user message/query."
     )
     history: List[ChatMessage] | None = Field(
         None,
@@ -104,6 +108,21 @@ class ChatResponse(BaseModel):
     intent: str | None = Field(
         None, 
         description="The classified conversational or clinical intent of the query."
+    )
+
+
+class FeedbackRequest(BaseModel):
+    vote: str = Field(
+        ...,
+        description="The user feedback vote, exactly 'up' or 'down'."
+    )
+    user_message: str = Field(
+        ...,
+        description="The user query associated with this feedback."
+    )
+    bot_response: str = Field(
+        ...,
+        description="The bot response associated with this feedback."
     )
 
 
@@ -284,6 +303,30 @@ def _init_chat_db() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_chat_interactions_user_id ON chat_interactions(user_id)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                vote TEXT NOT NULL,
+                user_message TEXT NOT NULL,
+                bot_response TEXT NOT NULL,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        conn.commit()
+
+
+def _save_feedback(user_id: int | None, vote: str, user_message: str, bot_response: str) -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO feedback (user_id, vote, user_message, bot_response)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, vote, user_message, bot_response),
         )
         conn.commit()
 
@@ -659,7 +702,8 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     if not _is_authenticated(page_request):
         raise HTTPException(status_code=401, detail="Authentication required.")
 
-    if not request.query or not request.query.strip():
+    query_text = (request.query or request.message or "").strip()
+    if not query_text:
         raise HTTPException(status_code=400, detail="Query text is required.")
 
     if rag is None:
@@ -672,21 +716,21 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     result: dict[str, Any] | None = None
     error_response: str | None = None
     try:
-        result = await route_query(request.query, rag, history=request.history)
+        result = await route_query(query_text, rag, history=request.history)
     except Exception:
         error_response = "Failed to generate a response."
 
     if not result or "answer" not in result:
         _save_chat_interaction(
             user_id=int(user_id),
-            query=request.query.strip(),
+            query=query_text,
             response=error_response or "Failed to generate a response.",
         )
         raise HTTPException(status_code=500, detail=error_response or "Failed to generate a response.")
 
     _save_chat_interaction(
         user_id=int(user_id),
-        query=request.query.strip(),
+        query=query_text,
         response=str(result["answer"]),
         language=result.get("language"),
         emotion=result.get("emotion"),
@@ -709,7 +753,8 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
     if not _is_authenticated(page_request):
         raise HTTPException(status_code=401, detail="Authentication required.")
 
-    if not request.query or not request.query.strip():
+    query_text = (request.query or request.message or "").strip()
+    if not query_text:
         raise HTTPException(status_code=400, detail="Query text is required.")
 
     if rag is None:
@@ -720,7 +765,7 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
         raise HTTPException(status_code=401, detail="Authentication required.")
 
     try:
-        result = await route_query(request.query, rag, history=request.history)
+        result = await route_query(query_text, rag, history=request.history)
     except Exception:
         result = {"answer": "Failed to generate a response.", "resources": []}
 
@@ -728,7 +773,7 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
     resources = result.get("resources", [])
     _save_chat_interaction(
         user_id=int(user_id),
-        query=request.query.strip(),
+        query=query_text,
         response=answer,
         language=result.get("language"),
         emotion=result.get("emotion"),
@@ -782,3 +827,22 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
     except Exception as e:
         print(f"--> [Speech-to-Text Error] Audio transcription failed: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+
+
+@app.post("/feedback")
+async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict:
+    """Saves user thumbs up/down feedback on bot replies."""
+    if not _is_authenticated(page_request):
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    if request.vote not in ("up", "down"):
+        raise HTTPException(status_code=400, detail="Vote must be 'up' or 'down'.")
+
+    user_id = page_request.session.get("user_id")
+    _save_feedback(
+        user_id=int(user_id) if user_id is not None else None,
+        vote=request.vote,
+        user_message=request.user_message.strip(),
+        bot_response=request.bot_response.strip(),
+    )
+    return {"status": "ok", "message": "Feedback saved successfully."}

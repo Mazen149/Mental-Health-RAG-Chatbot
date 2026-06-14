@@ -252,6 +252,82 @@
       return formattedText;
     };
 
+    const appendFeedbackActions = (wrapper, botResponseText) => {
+      const contentArea = wrapper.querySelector('.bubble-content-area');
+      if (!contentArea) return;
+
+      // Prevent duplicate feedback actions if already exists
+      if (contentArea.querySelector('.feedback-actions') || contentArea.querySelector('.feedback') || contentArea.querySelector('.feedback-clase')) return;
+
+      const feedbackContainer = document.createElement('div');
+      feedbackContainer.className = 'feedback-actions feedback feedback-clase';
+      feedbackContainer.innerHTML = `
+        <button type="button" class="feedback-btn feedback-up" title="Helpful reply">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="thumb-icon">
+            <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/>
+          </svg>
+        </button>
+        <button type="button" class="feedback-btn feedback-down" title="Not helpful reply">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="thumb-icon">
+            <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"/>
+          </svg>
+        </button>
+      `;
+
+      const upBtn = feedbackContainer.querySelector('.feedback-up');
+      const downBtn = feedbackContainer.querySelector('.feedback-down');
+
+      const handleFeedbackClick = async (vote) => {
+        let userQueryText = "";
+        let prevSib = wrapper.previousElementSibling;
+        while (prevSib) {
+          if (prevSib.classList.contains('user-wrapper')) {
+            const userBubble = prevSib.querySelector('.feedback-user-message') || prevSib.querySelector('.user-message') || prevSib.querySelector('.bubble.user');
+            if (userBubble) {
+              userQueryText = userBubble.textContent;
+            }
+            break;
+          }
+          prevSib = prevSib.previousElementSibling;
+        }
+
+        if (!userQueryText && chatHistory.length > 0) {
+          const userTurns = chatHistory.filter(h => h.role === 'user');
+          if (userTurns.length > 0) {
+            userQueryText = userTurns[userTurns.length - 1].content;
+          }
+        }
+
+        try {
+          const res = await fetch('/feedback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              vote: vote,
+              user_message: userQueryText || "Unknown",
+              bot_response: botResponseText
+            })
+          });
+          if (res.ok) {
+            if (vote === 'up') {
+              upBtn.classList.add('active');
+              downBtn.classList.remove('active');
+            } else {
+              downBtn.classList.add('active');
+              upBtn.classList.remove('active');
+            }
+          }
+        } catch (err) {
+          console.error("Failed to send feedback:", err);
+        }
+      };
+
+      upBtn.addEventListener('click', () => handleFeedbackClick('up'));
+      downBtn.addEventListener('click', () => handleFeedbackClick('down'));
+
+      contentArea.appendChild(feedbackContainer);
+    };
+
     const chatHistory = [];
 
     clearBtn.addEventListener('click', async () => {
@@ -384,6 +460,11 @@
 
       const bubble = document.createElement('div');
       bubble.className = `bubble ${role}`;
+      if (role === 'user') {
+        bubble.classList.add('user-message', 'feedback-user-message');
+      } else if (role === 'assistant') {
+        bubble.classList.add('bot-message', 'feedback-bot-message');
+      }
 
       if (role === 'assistant') {
         if (text === 'Thinking...') {
@@ -442,6 +523,9 @@
       } else {
         wrapper.appendChild(contentArea);
         wrapper.appendChild(avatar);
+      }
+      if (role === 'assistant' && text !== 'Thinking...') {
+        appendFeedbackActions(wrapper, text);
       }
 
       chatWindow.appendChild(wrapper);
@@ -740,6 +824,7 @@
           if (resources.length > 0) {
             addCitations(resources, assistantWrapper);
           }
+          appendFeedbackActions(assistantWrapper, streamedText);
           chatHistory.push({ role: 'assistant', content: streamedText });
         } else {
           thinkingBubble.remove();

@@ -1226,3 +1226,68 @@ textarea::placeholder {
   background: #2c2c2c;
   border-color: rgba(255, 255, 255, 0.15);
 }
+
+/* Feedback thumbs actions */
+.feedback-actions,
+.feedback,
+.feedback-clase {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+
+.bubble-wrapper:hover .feedback-actions,
+.bubble-wrapper:hover .feedback,
+.bubble-wrapper:hover .feedback-clase {
+  opacity: 1;
+}
+
+.feedback-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: none;
+  position: relative;
+  overflow: hidden;
+  width: 28px;
+  height: 28px;
+}
+
+.feedback-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.feedback-btn .thumb-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Green highlight for thumbs up */
+.feedback-btn.feedback-up.active {
+  color: #10a37f;
+  background: rgba(16, 163, 127, 0.12);
+  border: 1px solid rgba(16, 163, 127, 0.25);
+}
+
+/* Red highlight for thumbs down */
+.feedback-btn.feedback-down.active {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.feedback-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}

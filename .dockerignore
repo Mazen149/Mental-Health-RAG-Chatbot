@@ -1,0 +1,63 @@
+# =============================================================================
+# SANAD AI — Docker Ignore Patterns
+# =============================================================================
+# Avoids copying unnecessary, bulky, or sensitive files into the Docker build
+# context, keeping images lean, builds fast, and caching optimal.
+
+# ── Version Control ──
+.git
+.gitignore
+.gitattributes
+
+# ── Environment & Secrets (CRITICAL for security) ──
+.env
+.env.*
+!.env.example
+
+# ── Python Caches & Bytecode ──
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+# ── Virtual Environments ──
+.venv/
+venv/
+env/
+ENV/
+lib/
+lib64/
+bin/
+include/
+share/
+
+# ── Data, Databases, & ML Artifacts ──
+# (These folders are generated or mounted at runtime; do not bake into the image)
+artifacts/
+qdrant_db/
+metrics/
+notebooks/
+
+# ── IDEs & Editors ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Testing & Linting ──
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+tests/
+
+# ── Package Build / Distribution ──
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# ── Miscellaneous ──
+.pre-commit-config.yaml
+team_members.txt

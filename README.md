@@ -1,6 +1,6 @@
-# Serenity - Mental Health Support Chatbot
+# Sanad AI - Mental Health Support Chatbot
 
-A simple chat interface for the Serenity mental health support chatbot.
+A simple chat interface for the Sanad AI mental health support chatbot.
 
 **Live:** https://ishraq-hassan.github.io/chatbot-frontend/
 

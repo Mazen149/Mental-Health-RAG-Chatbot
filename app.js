@@ -9,7 +9,7 @@ const clearBtn = document.getElementById("clear-btn");
 const apiUrlInput = document.getElementById("api-url");
 const apiEndpointInput = document.getElementById("api-endpoint");
 
-const STORAGE_KEY = "serenity_settings";
+const STORAGE_KEY = "sanad_ai_settings";
 const defaults = { apiUrl: "https://surprising-beauty-production-34f3.up.railway.app", endpoint: "/chat" };
 
 function loadSettings() {
@@ -85,7 +85,7 @@ clearBtn.addEventListener("click", () => {
           <path d="M12 21C12 21 4 15 4 9.5C4 6.46 6.46 4 9.5 4C11.06 4 12.45 4.74 12 5.5C11.55 4.74 12.94 4 14.5 4C17.54 4 20 6.46 20 9.5C20 15 12 21 12 21Z"/>
         </svg>
       </div>
-      <h2>Welcome to Serenity</h2>
+      <h2>Welcome to Sanad AI</h2>
       <p>A safe space to talk about how you're feeling. I'm here to listen and help with questions about anxiety, depression, stress, and more.</p>
       <div class="quick-prompts">
         <button class="prompt-chip" data-prompt="I've been feeling really anxious lately">Feeling anxious</button>

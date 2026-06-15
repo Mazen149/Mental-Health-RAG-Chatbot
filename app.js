@@ -10,7 +10,7 @@ const apiUrlInput = document.getElementById("api-url");
 const apiEndpointInput = document.getElementById("api-endpoint");
 
 const STORAGE_KEY = "sanad_ai_settings";
-const defaults = { apiUrl: "http://18.185.89.252:8000", endpoint: "/chat" };
+const defaults = { apiUrl: "http://sanad-ai.myvnc.com:8000", endpoint: "/chat" };
 
 function loadSettings() {
   try {

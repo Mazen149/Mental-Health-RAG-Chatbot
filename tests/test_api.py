@@ -13,6 +13,13 @@ def test_health_check():
     assert response.json() == {"status": "ok"}
 
 
+def test_root_health_check():
+    """Test the root endpoint (Happy Path) maps to health check."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
 @patch("src.app.route_query")
 @patch("src.app.rag")
 def test_chat_happy_path(mock_rag, mock_route_query):

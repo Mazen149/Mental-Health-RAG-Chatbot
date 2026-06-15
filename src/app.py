@@ -541,6 +541,7 @@ async def shutdown_event() -> None:
 # ------------------------------------------------------------------------------
 
 
+@app.get("/")
 @app.get("/health")
 async def health_check() -> dict:
     """System health check endpoint."""

@@ -29,3 +29,18 @@ The frontend sends user messages to a backend API and displays the responses. It
 ## Settings
 
 Click the gear icon in the header to change the backend URL and chat endpoint at any time. Settings are saved in your browser's localStorage.
+
+## Docker Deployment
+
+The optimized production Docker image is built and available on Docker Hub:
+
+```bash
+docker pull mazen1393/sanad-ai-frontend:latest
+```
+
+To run the container locally, mapping host port 80 to container port 80:
+
+```bash
+docker run -d -p 80:80 --name sanad-ai-frontend mazen1393/sanad-ai-frontend:latest
+```
+

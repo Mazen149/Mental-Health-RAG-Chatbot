@@ -164,7 +164,7 @@ def validate_environment() -> None:
         
     # Verify mandatory dependencies
     required_packages = [
-        "peft", "transformers", "sentence_transformers", 
+        "fastembed", "onnxruntime", 
         "qdrant_client", "langchain_qdrant", "groq", "fastapi"
     ]
     for pkg in required_packages:
@@ -509,6 +509,11 @@ def _sse_event(event: str, data: Any) -> str:
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
     _init_chat_db()
+    
+    # Download missing artifacts from Hugging Face if needed
+    from .modules.downloader import download_artifacts
+    download_artifacts()
+    
     validate_environment()
     import asyncio
     

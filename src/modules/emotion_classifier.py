@@ -1,9 +1,8 @@
 import os
 from pathlib import Path
 import numpy as np
-import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
-from peft import PeftModel
+import onnxruntime as ort
+from tokenizers import Tokenizer
 from ..config import config
 
 EMOTION_MAP = {
@@ -11,31 +10,29 @@ EMOTION_MAP = {
     3: "Anger",   4: "Fear", 5: "Surprise"
 }
 
-
 class EmotionClassifier:
-    """Emotion classifier using XLM-RoBERTa-base + LoRA from emotion-classifier.ipynb."""
+    """Emotion classifier using XLM-RoBERTa-base ONNX exported model."""
 
-    def __init__(self, model_path: str | Path | None = None):
-        self.model_path = Path(model_path) if model_path else config.MOD2_DIR
-        if not self.model_path.exists():
-            raise FileNotFoundError(f"Model directory not found: {self.model_path}")
+    def __init__(self, model_dir: str | Path | None = None):
+        self.model_dir = Path(model_dir) if model_dir else config.MOD2_DIR
+        model_path = self.model_dir / "model.onnx"
+        
+        if not model_path.exists():
+            print(f"ONNX model not found at {model_path}. Please export it first.")
+            raise FileNotFoundError(f"Model file not found: {model_path}")
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        hf_token = config.HF_TOKEN
-
-        base_model = AutoModelForSequenceClassification.from_pretrained(
-            config.EMOTION_BASE_MODEL,
-            num_labels=len(EMOTION_MAP),
-            dtype=torch.float32,
-            ignore_mismatched_sizes=True,
-            token=hf_token
-        )
-
-        self.model = PeftModel.from_pretrained(base_model, self.model_path)
-        self.model.to(self.device)
-        self.model.eval()
-
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+        print(f"--> [Emotion Classifier] Loading ONNX model from {model_path}")
+        self.session = ort.InferenceSession(str(model_path))
+        
+        tokenizer_path = config.MOD2_DIR / "tokenizer.json"
+        if not tokenizer_path.exists():
+            tokenizer_path = self.model_dir / "tokenizer.json"
+        
+        print(f"--> [Emotion Classifier] Loading tokenizer from {tokenizer_path}")
+        self.tokenizer = Tokenizer.from_file(str(tokenizer_path))
+        
+        self.tokenizer.enable_truncation(max_length=64)
+        self.tokenizer.enable_padding(length=64)
 
     def predict(self, text: str) -> dict:
         if not text or not text.strip():
@@ -46,17 +43,20 @@ class EmotionClassifier:
                 "all_scores": {}
             }
 
-        inputs = self.tokenizer(
-            [text],
-            padding=True,
-            truncation=True,
-            max_length=64,
-            return_tensors="pt"
-        ).to(self.device)
+        encoded = self.tokenizer.encode(text)
+        
+        input_ids = np.array([encoded.ids], dtype=np.int64)
+        attention_mask = np.array([encoded.attention_mask], dtype=np.int64)
 
-        with torch.no_grad():
-            logits = self.model(**inputs).logits
-            probs = torch.softmax(logits, dim=1)[0].cpu().numpy()
+        ort_inputs = {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask
+        }
+        
+        logits = self.session.run(None, ort_inputs)[0]
+        # softmax
+        exp_logits = np.exp(logits[0] - np.max(logits[0]))
+        probs = exp_logits / exp_logits.sum()
 
         pred_idx = int(np.argmax(probs))
         pred_emotion = EMOTION_MAP[pred_idx]

@@ -61,6 +61,7 @@ class Config:
     # ------------------------------------------------------------------------------
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     HF_TOKEN = os.getenv("HF_TOKEN")
+    HF_ARTIFACTS_REPO = os.getenv("HF_ARTIFACTS_REPO", "mazen248/sanad-ai-artifacts")
     QDRANT_URL = os.getenv("QDRANT_URL")
     QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")

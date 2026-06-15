@@ -22,21 +22,13 @@ from huggingface_hub import InferenceClient
 from langchain_classic.retrievers.ensemble import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
 from langchain_qdrant import QdrantVectorStore
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+import numpy as np
 import pandas as pd
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance
-import torch
-
-# For test backward compatibility/mocking
-try:
-    from sentence_transformers import CrossEncoder
-except ImportError:
-    class CrossEncoder:
-        def __init__(self, model_name: str):
-            pass
 
 # Locate project root and load environment
 from ..config import config
@@ -161,22 +153,17 @@ class MentalHealthRAG:
     """
 
     def __init__(self, qdrant_path: str | None = None, cache_path: str | None = None):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.qdrant_path = qdrant_path if qdrant_path else str(config.QDRANT_LOCAL_PATH)
         self.cache_path = cache_path if cache_path else str(config.CACHE_PATH)
         self.collection_name = config.QDRANT_COLLECTION_NAME
 
-        self.embeddings = HuggingFaceEmbeddings(model_name=config.EMBEDDING_MODEL)
+        self.embeddings = FastEmbedEmbeddings(model_name=config.EMBEDDING_MODEL)
         self.rerank_client = InferenceClient(
             provider="hf-inference",
             api_key=config.HF_TOKEN,
             timeout=2.0,
         )
-        # For testing compatibility:
-        if "Mock" in type(CrossEncoder).__name__ or "MagicMock" in type(CrossEncoder).__name__:
-            self.rerank_model = CrossEncoder(config.RERANKER_MODEL)
-        else:
-            self.rerank_model = None
+        self.rerank_model = None
 
         self.vectorstore = None
         self.ensemble_retriever = None
@@ -358,24 +345,30 @@ class MentalHealthRAG:
         )
 
     def rerank_documents(self, query: str, docs: List[Document]) -> List[float]:
-        """Rerank documents using cosine similarity of embeddings instead of a CrossEncoder."""
+        """Rerank documents using cosine similarity of embeddings."""
         if not docs:
             return []
             
-        import torch.nn.functional as F
-        
         try:
             # Get query embedding
-            query_emb = self.embeddings.embed_query(query)
-            q_tensor = torch.tensor(query_emb).unsqueeze(0) # (1, D)
+            query_emb = np.array(self.embeddings.embed_query(query), dtype=np.float32)
             
             # Get document embeddings
             docs_texts = [doc.page_content for doc in docs]
-            docs_embs = self.embeddings.embed_documents(docs_texts)
-            d_tensor = torch.tensor(docs_embs) # (N, D)
+            docs_embs = np.array(self.embeddings.embed_documents(docs_texts), dtype=np.float32)
             
-            # Calculate cosine similarity
-            cos_sim = F.cosine_similarity(q_tensor, d_tensor)
+            # Calculate cosine similarity using numpy
+            # Normalize vectors
+            q_norm = np.linalg.norm(query_emb)
+            d_norms = np.linalg.norm(docs_embs, axis=1)
+            
+            q_norm = q_norm if q_norm > 0 else 1.0
+            d_norms = np.where(d_norms > 0, d_norms, 1.0)
+            
+            query_emb_norm = query_emb / q_norm
+            docs_embs_norm = docs_embs / d_norms[:, np.newaxis]
+            
+            cos_sim = np.dot(docs_embs_norm, query_emb_norm)
             
             return [float(score) for score in cos_sim.tolist()]
         except Exception as e:

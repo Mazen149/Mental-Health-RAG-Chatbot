@@ -104,12 +104,12 @@ class IntentClassifier:
         )
 
         try:
-            from sentence_transformers import SentenceTransformer
-            print("--> [Intent Classifier] Loading local sentence-transformer model...")
-            self.local_model = SentenceTransformer(self.embedding_model)
+            from fastembed import TextEmbedding
+            print("--> [Intent Classifier] Loading fastembed text-embedding model...")
+            self.local_model = TextEmbedding(self.embedding_model)
             self.use_local = True
         except Exception as e:
-            print(f"--> [Intent Classifier] Local sentence-transformer not used: {e}. Using HF API Client.")
+            print(f"--> [Intent Classifier] Local fastembed not used: {e}. Using HF API Client.")
             self.use_local = False
 
         # Precompute normalized embeddings for example sentences
@@ -117,7 +117,7 @@ class IntentClassifier:
             self.embedding_examples_embeddings = {
                 intent_type: self._normalize_embeddings(
                     np.asarray(
-                        self.local_model.encode(examples),
+                        list(self.local_model.embed(examples)),
                         dtype=np.float32,
                     )
                 )
@@ -197,7 +197,7 @@ class IntentClassifier:
 
     def _get_embedding(self, text: str) -> np.ndarray:
         if self.use_local:
-            embedding = self.local_model.encode(text)
+            embedding = list(self.local_model.embed([text]))[0]
         else:
             embedding = self.embedding_client.feature_extraction(
                 text,

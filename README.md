@@ -11,8 +11,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Tests-25%20Passed-brightgreen.svg?style=flat-square" alt="Unit Tests" />
-  <img src="https://img.shields.io/badge/PEFT-LoRA-lightgrey.svg?style=flat-square" alt="PEFT/LoRA" />
-  <img src="https://img.shields.io/badge/Reranking-BGE%20Reranker%20V2-blueviolet.svg?style=flat-square" alt="BGE Reranker" />
+  <img src="https://img.shields.io/badge/ONNX-Runtime-blue.svg?style=flat-square" alt="ONNX Runtime" />
+  <img src="https://img.shields.io/badge/FastEmbed-Lightning-yellow.svg?style=flat-square" alt="FastEmbed" />
   <img src="https://img.shields.io/badge/Embeddings-BGE%20Small%20en-orange.svg?style=flat-square" alt="BGE Embeddings" />
 </p>
 
@@ -93,19 +93,19 @@ graph TD
     *   Compiled prompt instructions are serialized to `artifacts/dspy optimized prompts/` and loaded automatically at startup.
 *   **⚡ Two-Layer Conversational Router**:
     *   *Layer 1 (Regex Fast Path)*: Instantly routes common greetings, gratitude, and goodbyes in English, Arabic, French, Spanish, German, and Italian (0ms latency).
-    *   *Layer 2 (Embedding Classifier)*: Classifies messages into `general`, `out_of_scope`, `asking_mental_health_question`, or `crisis` using `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` embeddings compared against query examples with a threshold of 0.65, falling back to a Groq LLM completion when necessary.
+    *   *Layer 2 (Embedding Classifier)*: Classifies messages into `general`, `out_of_scope`, `asking_mental_health_question`, or `crisis` using fast and lightweight `fastembed` multilingual embeddings (`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`) compared against query examples with a threshold of 0.65, falling back to a Groq LLM completion when necessary.
 *   **🛡️ Multi-Tiered Safety & Crisis Safeguards**:
     *   Detects suicidal or self-harm intents via matching crisis lists and embeddings.
     *   Employs a **Crisis Gate**: If an embedding classification detects a crisis with confidence under `0.85`, it escalates to the optimized DSPy LLM classifier for secondary validation to prevent false negatives.
     *   Automatically appends local emergency helplines in the user's language and blocks prompt injection attacks.
 *   **🎭 Emotion-Aware Adaptive Tone**:
-    *   Detects emotional state (Fear, Anger, Sadness, Joy, Love, Surprise) from the query using a dedicated adapter-tuned **XLM-RoBERTa** classifier. If top confidence is under 0.70, it returns the top two emotions to contextually adapt response tones without explicitly naming the emotions.
+    *   Detects emotional state (Fear, Anger, Sadness, Joy, Love, Surprise) from the query using a dedicated adapter-tuned **XLM-RoBERTa** classifier exported to **ONNX format**. The inference uses the lightweight `onnxruntime` engine rather than PyTorch to dramatically save memory and boost latency. If top confidence is under 0.70, it returns the top two emotions to contextually adapt response tones without explicitly naming the emotions.
 *   **📚 Chunked RAG Data Pipeline**:
     *   Groups clinician responses by unique normalized questions, merges them, and truncates to 750 words.
     *   Splits long merged responses into optimized chunks using `RecursiveCharacterTextSplitter` (chunk size = 500, overlap = 100) to find the most relevant portion, preventing context dilution and improving grounding precision.
 *   **🔍 Hybrid Retrieval & Interactive Grounding**:
     *   Retrieves the top relevant mental health contexts from an ensemble combining a **BM25 Retriever** (weight 0.45) and a **Qdrant Vector Database** (weight 0.55).
-    *   Applies **Cosine Similarity Scoring** locally using query embeddings to precisely filter the top 3 most relevant contexts without relying on external APIs.
+    *   Applies **Cosine Similarity Scoring** locally using `FastEmbed` embeddings and `NumPy` to precisely filter the top 3 most relevant contexts without relying on bulky PyTorch installations or external reranker APIs.
     *   Features an **Interactive Citations Modal UI**: Clicking inline citation numbers (e.g. `1`) or Grounded Reference Cards pops up a detailed overlay displaying the clinical advice and counselor case context.
 *   **👁️ LangSmith Observability**:
     *   End-to-end tracing integrated across the pipeline (from Router logic to DSPy LLM generation) to monitor latency, track costs, and evaluate output quality in real-time.
@@ -117,6 +117,9 @@ graph TD
     *   Optional translation pipeline (`Helsinki-NLP/opus-mt-mul-en`) to translate queries before retrieval and enforce responses in the user's native language.
 *   **📈 Integrated Evaluation Suite**:
     *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, factual correctness, and context recall.
+*   **☁️ Lightweight Cloud-Ready Deployment**:
+    *   The complete `artifacts/` folder (1.1GB+ of vectorizers, databases, and ONNX models) is hosted remotely on Hugging Face ([`mazen248/sanad-ai-artifacts`](https://huggingface.co/mazen248/sanad-ai-artifacts/tree/main)).
+    *   An automated startup downloader (`huggingface_hub`) intelligently fetches only the missing required artifacts at runtime, keeping the GitHub repository footprint extremely small and enabling instant deployment to platforms like Render, AWS, or Heroku.
 
 ---
 
@@ -140,10 +143,11 @@ Mental-Health-RAG-Chatbot/
 │   │
 │   ├── modules/                      # Modularised machine learning & NLP inference engines
 │   │   ├── __init__.py               # Convenience wrappers and singleton pipeline interfaces
+│   │   ├── downloader.py             # Hugging Face dynamic artifact fetcher on startup
 │   │   ├── language_detector.py      # TF-IDF + Logistic Regression language classifier
 │   │   ├── intent_classifier.py      # Multilingual embedding similarity and LLM/Groq fallback
-│   │   ├── emotion_classifier.py     # Custom fine-tuned XLM-RoBERTa + PEFT/LoRA adapter
-│   │   └── rag.py                    # BGE Hybrid retrieval, character chunking, and BGE reranking
+│   │   ├── emotion_classifier.py     # Fast ONNX Inference for XLM-RoBERTa emotion classifier
+│   │   └── rag.py                    # FastEmbed Hybrid retrieval, character chunking, and NumPy reranking
 │   │
 │   ├── prompts/                      # DSPy optimization, signatures, and datasets
 │   │   ├── prompts.py                # DSPy Modules (Router, Condenser, Response, General, Intent)
@@ -189,13 +193,11 @@ Mental-Health-RAG-Chatbot/
     ├── langauge_detection/           # Pickle model files for language detection
     │   ├── language_detection_best_model.pkl
     │   └── language_detection_best_vectorizer.pkl
-    ├── emotion_classifier/           # Fine-tuned XLM-RoBERTa adapter configuration and weights
-    │   ├── README.md
-    │   ├── adapter_config.json
-    │   ├── adapter_model.safetensors
-    │   ├── tokenizer.json
-    │   ├── tokenizer_config.json
-    │   └── training_config.json
+    ├── emotion_classifier/           # Fine-tuned XLM-RoBERTa classifier exported to ONNX
+    │   ├── model.onnx                # Exported ONNX graph architecture
+    │   ├── model.onnx.data           # Exported ONNX heavy tensor weights
+    │   ├── tokenizer.json            # FastTokenizer configuration
+    │   └── tokenizer_config.json
     └── dspy optimized prompts/       # Serialized prompt instructions from GEPA compilation
         ├── condenser_optimized.json
         ├── general_conversation_optimized.json
@@ -213,6 +215,7 @@ Create a `.env` file in the root directory and configure the following variables
 ```env
 GROQ_API_KEY=your_groq_api_key_here
 HF_TOKEN=your_hf_token_here
+HF_ARTIFACTS_REPO=mazen248/sanad-ai-artifacts
 
 # User Workspace Sessions
 SESSION_SECRET_KEY=your_secure_random_session_secret_here

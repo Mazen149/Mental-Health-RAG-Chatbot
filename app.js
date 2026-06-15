@@ -12,6 +12,15 @@ const apiEndpointInput = document.getElementById("api-endpoint");
 const STORAGE_KEY = "sanad_ai_settings";
 const defaults = { apiUrl: "http://sanad-ai.myvnc.com:8000", endpoint: "/chat" };
 
+// ── CORS proxy for mixed-content (HTTPS page → HTTP API) ──
+function proxyUrl(url) {
+  const needsProxy =
+    window.location.protocol === "https:" && url.startsWith("http://");
+  return needsProxy
+    ? "https://corsproxy.io/?" + url
+    : url;
+}
+
 function loadSettings() {
   try {
     return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) };
@@ -155,7 +164,7 @@ async function sendFeedback(btn, userMessage, botResponse) {
   btn.classList.add("selected");
 
   try {
-    await fetch(settings.apiUrl + "/feedback", {
+    await fetch(proxyUrl(settings.apiUrl + "/feedback"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -164,7 +173,7 @@ async function sendFeedback(btn, userMessage, botResponse) {
         bot_response: botResponse,
       }),
     });
-  } catch {}
+  } catch { }
 }
 
 function addError(text) {
@@ -216,7 +225,7 @@ async function send() {
   showTyping();
 
   try {
-    const url = settings.apiUrl + settings.endpoint;
+    const url = proxyUrl(settings.apiUrl + settings.endpoint);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

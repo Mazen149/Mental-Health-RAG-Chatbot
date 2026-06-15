@@ -62,6 +62,7 @@ def test_intent_classifier_embedding_match():
 def test_intent_classifier_llm_fallback_success():
     """Verify cascading to Groq fallback when embedding classifier returns None."""
     classifier = IntentClassifier()
+    classifier.lm = MagicMock()  # Mock LM to be not None for the fallback check
 
     with patch.object(classifier, "_embedding_classifier", return_value=None):
         # Mock fallback_module

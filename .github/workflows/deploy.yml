@@ -97,11 +97,12 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          envs: ENV_FILE_CONTENT
           script: |
             set -euxo pipefail
 
-            # Write the .env file from GitHub Secrets
-            echo '${{ secrets.ENV_FILE_CONTENT }}' > ~/app.env
+            # Write the .env file from the environment variable safely
+            echo "$ENV_FILE_CONTENT" > ~/app.env
 
             # Pull the latest image
             docker pull ${{ env.DOCKER_IMAGE }}:latest
@@ -135,3 +136,5 @@ jobs:
             echo "❌ Health check failed after 5 minutes"
             docker logs sanad-ai --tail 50
             exit 1
+        env:
+          ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}

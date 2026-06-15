@@ -20,7 +20,7 @@
 
 ## 🌟 Overview
 
-**Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support. 
+**Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support.
 
 The application features secure user workspaces (authentication and persistent chat histories via a local SQLite database), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
 
@@ -34,26 +34,26 @@ The chatbot employs a multi-layered classification, routing, and retrieval pipel
 graph TD
     UserQuery([User Query / Whisper STT]) --> LangDetect["Language Detection"]
     LangDetect --> Layer1Router{"Layer 1: Regex Fast-Path?"}
-    
+
     %% Direct Responses
     Layer1Router -- "Yes (Greeting/Goodbye/Gratitude)" --> DirectResponse["Direct Multilingual Response"]
     DirectResponse --> Output([User Response])
 
     %% NLP Processing Layer
     Layer1Router -- "No" --> ClassificationFork["Parallel Stage Execution"]
-    
+
     %% Parallel Classification
     ClassificationFork --> IntentClass["Intent Classification: Multilingual Embeddings + Cosine Similarity & LLM Fallback"]
     ClassificationFork --> EmotionClass["Emotion Classification: Fine-tuned XLM-RoBERTa + LoRA Adapter"]
 
     %% Intent Routing Decision
     IntentClass --> IntentRouter{"Classified Intent?"}
-    
+
     IntentRouter -- "greeting / goodbye / gratitude" --> DirectResponse
-    
+
     IntentRouter -- "crisis" --> CrisisResponse["Safety Response: Critical Crisis Helpline Message"]
     CrisisResponse --> Output
-    
+
     IntentRouter -- "out_of_scope" --> RedirectResponse["Off-Topic Polite Redirect Response"]
     RedirectResponse --> Output
 
@@ -61,7 +61,7 @@ graph TD
     TranslationCheck -- "Yes (Not EN & Translation Enabled)" --> TransEngine["Translate Query: Groq / Helsinki-NLP Fallback"]
     TranslationCheck -- "No" --> RAGEngine["RAG Engine Pipeline"]
     TransEngine --> RAGEngine
-    
+
     %% RAG Engine Pipeline
     RAGEngine --> HybridRetrieval["Hybrid Ensemble Retrieval: BM25 + Qdrant DB with BGE Embeddings"]
     HybridRetrieval --> Reranker["Local Reranking: Cosine Similarity Scoring & BGE Cross-Encoder"]
@@ -283,7 +283,7 @@ uv run pytest
 
 ## 📊 Evaluation & RAGAS Experiments
 
-To ensure clinical grounding and response quality, the retrieval and generation pipeline was systematically evaluated using the **RAGAS (Retrieval Augmented Generation Assessment)** and **DeepEval** frameworks. 
+To ensure clinical grounding and response quality, the retrieval and generation pipeline was systematically evaluated using the **RAGAS (Retrieval Augmented Generation Assessment)** and **DeepEval** frameworks.
 
 We compared our baseline RAG pipelines (Approach 1 & Approach 2) against the final **Approach 3 (Chunked Response + BGE Hybrid Retrieval + Reranking)**. The experiments demonstrated substantial performance gains:
 

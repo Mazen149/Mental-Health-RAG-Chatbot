@@ -36,32 +36,26 @@ from .config import config
 from .modules.rag import MentalHealthRAG
 from .router import route_query
 
+
 # ------------------------------------------------------------------------------
 # 2. Pydantic API Schemas
 # ------------------------------------------------------------------------------
 class ChatMessage(BaseModel):
     role: str = Field(
-        ...,
-        description="The role of the message sender: 'user' or 'assistant'."
+        ..., description="The role of the message sender: 'user' or 'assistant'."
     )
-    content: str = Field(
-        ...,
-        description="The text content of the message."
-    )
+    content: str = Field(..., description="The text content of the message.")
 
 
 class ChatRequest(BaseModel):
     query: str | None = Field(
-        None, 
-        description="The user's query or message to the mental health chatbot."
+        None, description="The user's query or message to the mental health chatbot."
     )
     message: str | None = Field(
-        None,
-        description="Alternative field for user message/query."
+        None, description="Alternative field for user message/query."
     )
     history: List[ChatMessage] | None = Field(
-        None,
-        description="The recent chat history turns for conversational context."
+        None, description="The recent chat history turns for conversational context."
     )
 
 
@@ -76,54 +70,48 @@ class HistoryItem(BaseModel):
 
 class Resource(BaseModel):
     score: float = Field(
-        ..., 
-        description="The semantic or reranked relevance score of this document context."
+        ...,
+        description="The semantic or reranked relevance score of this document context.",
     )
     page_content: str = Field(
-        ..., 
-        description="The counseling context representing the user's situation."
+        ..., description="The counseling context representing the user's situation."
     )
     response: str = Field(
-        ..., 
-        description="The verified clinical advice or response corresponding to this context."
+        ...,
+        description="The verified clinical advice or response corresponding to this context.",
     )
 
 
 class ChatResponse(BaseModel):
     answer: str = Field(
-        ..., 
-        description="The empathetic, model-generated response grounded in grounding contexts."
+        ...,
+        description="The empathetic, model-generated response grounded in grounding contexts.",
     )
     resources: List[Resource] = Field(
-        ..., 
-        description="The list of grounding counseling cases and clinician advices retrieved."
+        ...,
+        description="The list of grounding counseling cases and clinician advices retrieved.",
     )
     language: str | None = Field(
-        None, 
-        description="The detected language of the user query."
+        None, description="The detected language of the user query."
     )
     emotion: List[str] | None = Field(
-        None, 
-        description="The detected emotional states from emotion classifier."
+        None, description="The detected emotional states from emotion classifier."
     )
     intent: str | None = Field(
-        None, 
-        description="The classified conversational or clinical intent of the query."
+        None,
+        description="The classified conversational or clinical intent of the query.",
     )
 
 
 class FeedbackRequest(BaseModel):
     vote: str = Field(
-        ...,
-        description="The user feedback vote, exactly 'up' or 'down'."
+        ..., description="The user feedback vote, exactly 'up' or 'down'."
     )
     user_message: str = Field(
-        ...,
-        description="The user query associated with this feedback."
+        ..., description="The user query associated with this feedback."
     )
     bot_response: str = Field(
-        ...,
-        description="The bot response associated with this feedback."
+        ..., description="The bot response associated with this feedback."
     )
 
 
@@ -136,43 +124,47 @@ def validate_environment() -> None:
     and Qdrant connectivity before server boot.
     """
     errors = []
-    
+
     # Verify environment API variables
     groq_api_key = config.GROQ_API_KEY
     hf_token = config.HF_TOKEN
     qdrant_url = config.QDRANT_URL
     qdrant_api_key = config.QDRANT_API_KEY
-    
+
     qdrant_local_path = str(config.QDRANT_LOCAL_PATH)
-    
+
     if not groq_api_key:
         errors.append("Missing environment variable: GROQ_API_KEY")
     if not hf_token:
         errors.append("Missing environment variable: HF_TOKEN")
-        
+
     qdrant_ok = False
     if qdrant_url:
         qdrant_ok = True
     elif os.path.exists(qdrant_local_path):
         qdrant_ok = True
-        
+
     if not qdrant_ok:
         errors.append(
             f"Qdrant database not configured. Neither QDRANT_URL is set, "
             f"nor does local Qdrant database exist at: {qdrant_local_path}"
         )
-        
+
     # Verify mandatory dependencies
     required_packages = [
-        "fastembed", "onnxruntime", 
-        "qdrant_client", "langchain_qdrant", "groq", "fastapi"
+        "fastembed",
+        "onnxruntime",
+        "qdrant_client",
+        "langchain_qdrant",
+        "groq",
+        "fastapi",
     ]
     for pkg in required_packages:
         try:
             importlib.import_module(pkg)
         except ImportError:
             errors.append(f"Missing required pip package: {pkg}")
-            
+
     # Verify Module 1 Language Detection model pickles
     mod1_vectorizer = str(config.MOD1_VECTORIZER_PATH)
     mod1_classifier = str(config.MOD1_CLASSIFIER_PATH)
@@ -180,7 +172,7 @@ def validate_environment() -> None:
         errors.append(f"Module 1 vectorizer pickle not found at: {mod1_vectorizer}")
     if not os.path.exists(mod1_classifier):
         errors.append(f"Module 1 classifier pickle not found at: {mod1_classifier}")
-        
+
     # Verify Module 2 Emotion Classification model adapter config
     mod2_dir = str(config.MOD2_DIR)
     mod2_config = str(config.MOD2_CONFIG_PATH)
@@ -188,33 +180,41 @@ def validate_environment() -> None:
         errors.append(f"Module 2 model directory not found at: {mod2_dir}")
     elif not os.path.exists(mod2_config):
         errors.append(f"Module 2 adapter config not found at: {mod2_config}")
-        
+
     # Verify Qdrant database collection presence
     if qdrant_ok:
         try:
             from qdrant_client import QdrantClient
+
             if qdrant_url:
                 client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
             else:
                 client = QdrantClient(path=qdrant_local_path)
-            
+
             collections = [c.name for c in client.get_collections().collections]
             if config.QDRANT_COLLECTION_NAME not in collections:
-                print(f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' not found. It will be created on startup.")
+                print(
+                    f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' not found. It will be created on startup."
+                )
             else:
                 count_info = client.count(collection_name=config.QDRANT_COLLECTION_NAME)
                 if count_info.count == 0:
-                    print(f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' is empty. It will be populated on startup.")
+                    print(
+                        f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' is empty. It will be populated on startup."
+                    )
             client.close()
         except Exception as e:
             errors.append(f"Failed to connect to Qdrant or query collection: {e}")
-            
+
     if errors:
-        print("\n" + "="*80, file=sys.stderr)
-        print("ENVIRONMENT VALIDATION FAILED on startup. Please resolve these issues:", file=sys.stderr)
+        print("\n" + "=" * 80, file=sys.stderr)
+        print(
+            "ENVIRONMENT VALIDATION FAILED on startup. Please resolve these issues:",
+            file=sys.stderr,
+        )
         for err in errors:
             print(f" - {err}", file=sys.stderr)
-        print("="*80 + "\n", file=sys.stderr)
+        print("=" * 80 + "\n", file=sys.stderr)
         sys.exit(1)
 
 
@@ -270,7 +270,9 @@ def _is_authenticated(request: Request) -> bool:
 
 def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
     salt = salt or os.urandom(16)
-    password_hash = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, 200_000)
+    password_hash = hashlib.pbkdf2_hmac(
+        "sha256", password.encode("utf-8"), salt, 200_000
+    )
     return salt.hex(), password_hash.hex()
 
 
@@ -328,7 +330,9 @@ def _init_chat_db() -> None:
         conn.commit()
 
 
-def _save_feedback(user_id: int | None, vote: str, user_message: str, bot_response: str) -> None:
+def _save_feedback(
+    user_id: int | None, vote: str, user_message: str, bot_response: str
+) -> None:
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
@@ -399,12 +403,16 @@ def _create_user(username: str, password: str) -> dict[str, Any]:
             """,
             (cursor.lastrowid,),
         ).fetchone()
-        return dict(row) if row else {
-            "id": cursor.lastrowid,
-            "username": username,
-            "password_salt": salt_hex,
-            "password_hash": password_hash_hex,
-        }
+        return (
+            dict(row)
+            if row
+            else {
+                "id": cursor.lastrowid,
+                "username": username,
+                "password_salt": salt_hex,
+                "password_hash": password_hash_hex,
+            }
+        )
 
 
 def _update_last_login(user_id: int) -> None:
@@ -426,8 +434,12 @@ def _save_chat_interaction(
     intent: str | None = None,
     resources: list | None = None,
 ) -> None:
-    emotion_json = json.dumps(emotion, ensure_ascii=False) if emotion is not None else None
-    resources_json = json.dumps(resources, ensure_ascii=False) if resources is not None else None
+    emotion_json = (
+        json.dumps(emotion, ensure_ascii=False) if emotion is not None else None
+    )
+    resources_json = (
+        json.dumps(resources, ensure_ascii=False) if resources is not None else None
+    )
     with _db_connection() as conn:
         conn.execute(
             """
@@ -509,14 +521,15 @@ def _sse_event(event: str, data: Any) -> str:
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
     _init_chat_db()
-    
+
     # Download missing artifacts from Hugging Face if needed
     from .modules.downloader import download_artifacts
+
     download_artifacts()
-    
+
     validate_environment()
     import asyncio
-    
+
     async def load_rag():
         global rag
         rag = MentalHealthRAG()
@@ -525,12 +538,9 @@ async def startup_event() -> None:
         print("--> [RAG Setup] Vector store and retrievers preloaded successfully.")
 
     from .router import preload_models
-    
+
     # Preload RAG and classifier/translator models concurrently
-    await asyncio.gather(
-        load_rag(),
-        preload_models()
-    )
+    await asyncio.gather(load_rag(), preload_models())
 
 
 @app.on_event("shutdown")
@@ -730,7 +740,6 @@ async def clear_chat(request: Request) -> dict:
     return {"status": "ok", "message": "Chat history cleared successfully."}
 
 
-
 @app.post("/chat", response_model=ChatResponse)
 async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
@@ -758,7 +767,9 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
             query=query_text,
             response=error_response or "Failed to generate a response.",
         )
-        raise HTTPException(status_code=500, detail=error_response or "Failed to generate a response.")
+        raise HTTPException(
+            status_code=500, detail=error_response or "Failed to generate a response."
+        )
 
     _save_chat_interaction(
         user_id=int(user_id),
@@ -811,11 +822,14 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
     )
 
     async def event_generator():
-        yield _sse_event("meta", {
-            "language": result.get("language"),
-            "emotion": result.get("emotion"),
-            "intent": result.get("intent"),
-        })
+        yield _sse_event(
+            "meta",
+            {
+                "language": result.get("language"),
+                "emotion": result.get("emotion"),
+                "intent": result.get("intent"),
+            },
+        )
         yield _sse_event("start", {"status": "streaming"})
 
         for chunk in _split_stream_chunks(answer, chunk_size=18):
@@ -841,12 +855,13 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
 
     try:
         from groq import Groq
+
         # Initialize Groq client
         client = Groq(api_key=config.GROQ_API_KEY)
-        
+
         file_bytes = await file.read()
         filename = file.filename or "recording.wav"
-        
+
         # Call Groq's speech-to-text API
         transcription = client.audio.transcriptions.create(
             file=(filename, file_bytes),
@@ -855,7 +870,9 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
         return {"text": transcription.text}
     except Exception as e:
         print(f"--> [Speech-to-Text Error] Audio transcription failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to transcribe audio: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to transcribe audio: {str(e)}"
+        )
 
 
 @app.post("/feedback")

@@ -7,17 +7,13 @@ reranking via Hugging Face inference API, and LLM empathetic grounding.
 ================================================================================
 """
 
-import json
 from langsmith import traceable
 import os
-from pathlib import Path
 import pickle
 import re
 from typing import List
 
 import dspy
-from dotenv import load_dotenv
-from groq import Groq
 from huggingface_hub import InferenceClient
 from langchain_classic.retrievers.ensemble import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
@@ -32,65 +28,161 @@ from qdrant_client.models import Distance
 
 # Locate project root and load environment
 from ..config import config
+from ..prompts.prompts import (
+    RetrievalRouterModule,
+    QueryCondenserModule,
+    GroundedResponseModule,
+    GeneralConversationModule,
+)
 
 CRISIS_KEYWORDS = [
     # English
-    "suicide", "suicidal", "kill myself", "end my life", "self-harm", "harm myself", "cutting", "hang myself", "overdose",
+    "suicide",
+    "suicidal",
+    "kill myself",
+    "end my life",
+    "self-harm",
+    "harm myself",
+    "cutting",
+    "hang myself",
+    "overdose",
     # Arabic
-    "انتحار", "إنتحار", "الانتحار", "الإنتحار", "أنهي حياتي", "أقتل نفسي", "إيذاء نفسي", "قاتل نفسي",
+    "انتحار",
+    "إنتحار",
+    "الانتحار",
+    "الإنتحار",
+    "أنهي حياتي",
+    "أقتل نفسي",
+    "إيذاء نفسي",
+    "قاتل نفسي",
     # Urdu
-    "خودکشی", "اپنی زندگی ختم", "خود کو نقصان",
+    "خودکشی",
+    "اپنی زندگی ختم",
+    "خود کو نقصان",
     # Hindi
-    "आत्महत्या", "जान दे दूंगा", "खुद को नुकसान",
+    "आत्महत्या",
+    "जान दे दूंगा",
+    "खुद को नुकसान",
     # French
-    "suicide", "me tuer", "fin à mes jours", "m'auto-mutiler", "me couper",
+    "suicide",
+    "me tuer",
+    "fin à mes jours",
+    "m'auto-mutiler",
+    "me couper",
     # Spanish
-    "suicidio", "quitarme la vida", "matarme", "hacerme daño", "autolesion",
+    "suicidio",
+    "quitarme la vida",
+    "matarme",
+    "hacerme daño",
+    "autolesion",
     # German
-    "selbstmord", "freitod", "leben beenden", "mir wehtun", "ritzen",
+    "selbstmord",
+    "freitod",
+    "leben beenden",
+    "mir wehtun",
+    "ritzen",
     # Italian
-    "suicidio", "uccidermi", "farla finita", "autolesionismo", "farmi del male",
+    "suicidio",
+    "uccidermi",
+    "farla finita",
+    "autolesionismo",
+    "farmi del male",
     # Portuguese
-    "suicídio", "me matar", "tirar minha vida", "me cortar", "me automotilar",
+    "suicídio",
+    "me matar",
+    "tirar minha vida",
+    "me cortar",
+    "me automotilar",
     # Russian
-    "самоубийство", "убить себя", "покончить с собой", "нанести себе вред", "порезать себя",
+    "самоубийство",
+    "убить себя",
+    "покончить с собой",
+    "нанести себе вред",
+    "порезать себя",
     # Turkish
-    "intihar", "canıma kıymak", "kendimi öldürmek", "kendime zarar",
+    "intihar",
+    "canıma kıymak",
+    "kendimi öldürmek",
+    "kendime zarar",
     # Japanese
-    "自殺", "命を絶つ", "死にたい", "自傷", "自分を傷つける",
+    "自殺",
+    "命を絶つ",
+    "死にたい",
+    "自傷",
+    "自分を傷つける",
     # Chinese
-    "自杀", "结束生命", "想死", "自残", "伤害自己",
+    "自杀",
+    "结束生命",
+    "想死",
+    "自残",
+    "伤害自己",
     # Vietnamese
-    "tự tử", "tự sát", "kết liễu cuộc đời", "hủy hoại bản thân", "tự làm đau",
+    "tự tử",
+    "tự sát",
+    "kết liễu cuộc đời",
+    "hủy hoại bản thân",
+    "tự làm đau",
     # Polish
-    "samobójstwo", "zabić się", "odebrać sobie życie", "samookaleczanie",
+    "samobójstwo",
+    "zabić się",
+    "odebrać sobie życie",
+    "samookaleczanie",
     # Dutch
-    "zelfmoord", "suïcide", "mijn leven beëindigen", "mezelf pijn doen",
+    "zelfmoord",
+    "suïcide",
+    "mijn leven beëindigen",
+    "mezelf pijn doen",
     # Bulgarian
-    "самоубийство", "да се убия", "да край на живота си", "самонараняване",
+    "самоубийство",
+    "да се убия",
+    "да край на живота си",
+    "самонараняване",
     # Greek
-    "αυτοκτονία", "να αυτοκτονήσω", "να δώσω τέλος", "αυτοτραυματισμός",
+    "αυτοκτονία",
+    "να αυτοκτονήσω",
+    "να δώσω τέλος",
+    "αυτοτραυματισμός",
     # Swahili
-    "kujiua", "kumaliza maisha", "kujidhuru",
+    "kujiua",
+    "kumaliza maisha",
+    "kujidhuru",
     # Thai
-    "ฆ่าตัวตาย", "จบชีวิต", "ทำร้ายตัวเอง"
+    "ฆ่าตัวตาย",
+    "จบชีวิต",
+    "ทำร้ายตัวเอง",
 ]
 
 PROMPT_INJECTION_INDICATORS = [
-    "ignore previous instructions", "ignore above instructions", "ignore system instructions", 
-    "ignore your system prompt", "bypass your safety", "jailbreak", "do anything now", 
-    "ignore the rules", "you must now act as", "you are now a", "system bypass",
-    "تجاهل التعليمات", "تجاهل القواعد", "أنت الآن", "إلغاء تفعيل الحماية",
-    "ignorez les instructions", "tu es maintenant", "ignore las instrucciones", "ahora eres",
-    "ignoriere die anweisungen", "du bist jetzt", "ignoriere alle regeln"
+    "ignore previous instructions",
+    "ignore above instructions",
+    "ignore system instructions",
+    "ignore your system prompt",
+    "bypass your safety",
+    "jailbreak",
+    "do anything now",
+    "ignore the rules",
+    "you must now act as",
+    "you are now a",
+    "system bypass",
+    "تجاهل التعليمات",
+    "تجاهل القواعد",
+    "أنت الآن",
+    "إلغاء تفعيل الحماية",
+    "ignorez les instructions",
+    "tu es maintenant",
+    "ignore las instrucciones",
+    "ahora eres",
+    "ignoriere die anweisungen",
+    "du bist jetzt",
+    "ignoriere alle regeln",
 ]
 
 
 def normalize_text(text: str) -> str:
     """Normalize text: replace newlines/tabs with a space, collapse multiple spaces, lowercase."""
     text = str(text)
-    text = re.sub(r'[\r\n\t]+', ' ', text)
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r"[\r\n\t]+", " ", text)
+    text = re.sub(r"\s+", " ", text)
     return text.strip().lower()
 
 
@@ -107,13 +199,50 @@ def detect_prompt_injection(query: str) -> bool:
 def detect_medicine_query(query: str) -> bool:
     q_lower = query.lower()
     meds = [
-        "xanax", "prozac", "lexapro", "zoloft", "ritalin", "adderall", "valium", "ativan", 
-        "klonopin", "wellbutrin", "effexor", "cymbalta", "seroquel", "abilify", 
-        "antidepressant", "prescribe", "prescription", "psychiatrist", "psychiatry", "psychiatric",
-        "الزنكس", "البروزاك", "مضاد للاكتئاب", "وصفة طبية", "دواء", "دوا", "أدوية", "طبيب نفسي", "الطب النفسي",
-        "médicament", "médicaments", "prescrire", "ordonnance", "psychiatre",
-        "medicamento", "medicamentos", "recetar", "receta", "psiquiatra",
-        "medikament", "antidepressivum", "verschreiben", "rezept", "psychiater"
+        "xanax",
+        "prozac",
+        "lexapro",
+        "zoloft",
+        "ritalin",
+        "adderall",
+        "valium",
+        "ativan",
+        "klonopin",
+        "wellbutrin",
+        "effexor",
+        "cymbalta",
+        "seroquel",
+        "abilify",
+        "antidepressant",
+        "prescribe",
+        "prescription",
+        "psychiatrist",
+        "psychiatry",
+        "psychiatric",
+        "الزنكس",
+        "البروزاك",
+        "مضاد للاكتئاب",
+        "وصفة طبية",
+        "دواء",
+        "دوا",
+        "أدوية",
+        "طبيب نفسي",
+        "الطب النفسي",
+        "médicament",
+        "médicaments",
+        "prescrire",
+        "ordonnance",
+        "psychiatre",
+        "medicamento",
+        "medicamentos",
+        "recetar",
+        "receta",
+        "psiquiatra",
+        "medikament",
+        "antidepressivum",
+        "verschreiben",
+        "rezept",
+        "psychiater",
     ]
     return any(m in q_lower for m in meds)
 
@@ -121,34 +250,57 @@ def detect_medicine_query(query: str) -> bool:
 def check_medical_advice(answer: str, language: str) -> str:
     ans_lower = answer.lower()
     meds = [
-        "xanax", "prozac", "lexapro", "zoloft", "ritalin", "adderall", "valium", "ativan", 
-        "klonopin", "wellbutrin", "effexor", "cymbalta", "seroquel", "abilify", 
-        "antidepressant", "prescribe", "prescription", "psychiatrist",
-        "الزنكس", "البروزاك", "مضاد للاكتئاب", "وصفة طبية", "دواء", "دوا", "أدوية", "طبيب نفسي",
-        "médicament", "médicaments", "prescrire", "ordonnance",
-        "medicamento", "medicamentos", "recetar", "receta",
-        "medikament", "antidepressivum", "verschreiben", "rezept"
+        "xanax",
+        "prozac",
+        "lexapro",
+        "zoloft",
+        "ritalin",
+        "adderall",
+        "valium",
+        "ativan",
+        "klonopin",
+        "wellbutrin",
+        "effexor",
+        "cymbalta",
+        "seroquel",
+        "abilify",
+        "antidepressant",
+        "prescribe",
+        "prescription",
+        "psychiatrist",
+        "الزنكس",
+        "البروزاك",
+        "مضاد للاكتئاب",
+        "وصفة طبية",
+        "دواء",
+        "دوا",
+        "أدوية",
+        "طبيب نفسي",
+        "médicament",
+        "médicaments",
+        "prescrire",
+        "ordonnance",
+        "medicamento",
+        "medicamentos",
+        "recetar",
+        "receta",
+        "medikament",
+        "antidepressivum",
+        "verschreiben",
+        "rezept",
     ]
     if any(m in ans_lower for m in meds):
         from .multilingual_patterns import MEDICAL_DISCLAIMERS
+
         disclaimer = MEDICAL_DISCLAIMERS.get(language, MEDICAL_DISCLAIMERS["English"])
         if disclaimer not in answer:
             answer = f"{answer.rstrip()}\n\n*{disclaimer}*"
     return answer
 
 
-
-from ..prompts.prompts import (
-    RetrievalRouterModule,
-    QueryCondenserModule,
-    GroundedResponseModule,
-    GeneralConversationModule
-)
-
-
 class MentalHealthRAG:
     """
-    RAG pipeline combining BM25 and Qdrant dense embeddings with 
+    RAG pipeline combining BM25 and Qdrant dense embeddings with
     Hugging Face batch CrossEncoder reranking.
     """
 
@@ -168,7 +320,7 @@ class MentalHealthRAG:
         self.vectorstore = None
         self.ensemble_retriever = None
         self.qdrant_client = None
-        
+
         # Generation model and chunk settings
         self.model_name = config.GROQ_GENERATION_MODEL
         self.chunk_size = 500
@@ -207,23 +359,35 @@ class MentalHealthRAG:
             try:
                 with open(self.cache_path, "rb") as f:
                     cache_data = pickle.load(f)
-                
+
                 # Verify settings metadata
-                if isinstance(cache_data, dict) and "metadata" in cache_data and "documents" in cache_data:
+                if (
+                    isinstance(cache_data, dict)
+                    and "metadata" in cache_data
+                    and "documents" in cache_data
+                ):
                     cached_metadata = cache_data["metadata"]
-                    if (cached_metadata.get("dataset_url") == dataset_url and
-                        cached_metadata.get("chunk_size") == self.chunk_size and
-                        cached_metadata.get("chunk_overlap") == self.chunk_overlap):
-                        print(f"--> [RAG Setup] Loading preprocessed documents from cache: {self.cache_path}")
+                    if (
+                        cached_metadata.get("dataset_url") == dataset_url
+                        and cached_metadata.get("chunk_size") == self.chunk_size
+                        and cached_metadata.get("chunk_overlap") == self.chunk_overlap
+                    ):
+                        print(
+                            f"--> [RAG Setup] Loading preprocessed documents from cache: {self.cache_path}"
+                        )
                         return cache_data["documents"]
                     else:
-                        print("--> [RAG Setup] Cache settings mismatch. Regenerating cache...")
+                        print(
+                            "--> [RAG Setup] Cache settings mismatch. Regenerating cache..."
+                        )
                 else:
                     print("--> [RAG Setup] Legacy cache found. Regenerating cache...")
             except Exception as e:
                 print(f"--> [RAG Setup] Error loading cache: {e}. Regenerating...")
 
-        print("--> [RAG Setup] Preprocessed cache not found. Downloading and preprocessing dataset...")
+        print(
+            "--> [RAG Setup] Preprocessed cache not found. Downloading and preprocessing dataset..."
+        )
         df = pd.read_json(dataset_url, lines=True)
 
         # Step 1: Normalize + dedup + group (Approach 3)
@@ -231,9 +395,8 @@ class MentalHealthRAG:
         df["Response_norm"] = df["Response"].apply(normalize_text)
         df_dedup = df.drop_duplicates(subset=["Context_norm", "Response_norm"]).copy()
 
-        df_grouped = (
-            df_dedup.groupby("Context_norm", as_index=False)
-            .agg({"Context": "first", "Response": " ".join})
+        df_grouped = df_dedup.groupby("Context_norm", as_index=False).agg(
+            {"Context": "first", "Response": " ".join}
         )
         df_grouped.drop(index=0, errors="ignore", inplace=True)
         df_grouped.reset_index(drop=True, inplace=True)
@@ -258,24 +421,25 @@ class MentalHealthRAG:
 
             if not chunks:
                 # Response too short to chunk — use as-is
-                documents.append(Document(
-                    page_content=f"{question}\n\n{full_response}",
-                    metadata={"question": question, "response": full_response},
-                ))
+                documents.append(
+                    Document(
+                        page_content=f"{question}\n\n{full_response}",
+                        metadata={"question": question, "response": full_response},
+                    )
+                )
             else:
                 for chunk in chunks:
-                    documents.append(Document(
-                        page_content=f"{question}\n\n{chunk}",
-                        metadata={"question": question, "response": full_response},
-                    ))
+                    documents.append(
+                        Document(
+                            page_content=f"{question}\n\n{chunk}",
+                            metadata={"question": question, "response": full_response},
+                        )
+                    )
 
         # Save to cache
         os.makedirs(os.path.dirname(self.cache_path), exist_ok=True)
         with open(self.cache_path, "wb") as f:
-            pickle.dump({
-                "metadata": current_settings,
-                "documents": documents
-            }, f)
+            pickle.dump({"metadata": current_settings, "documents": documents}, f)
 
         return documents
 
@@ -288,7 +452,9 @@ class MentalHealthRAG:
             print(f"--> [RAG Setup] Connecting to Qdrant Cloud at: {qdrant_url}")
             self.qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
         else:
-            print(f"--> [RAG Setup] Connecting to local Qdrant database at: {self.qdrant_path}")
+            print(
+                f"--> [RAG Setup] Connecting to local Qdrant database at: {self.qdrant_path}"
+            )
             self.qdrant_client = QdrantClient(path=self.qdrant_path)
 
         collections = [c.name for c in self.qdrant_client.get_collections().collections]
@@ -302,13 +468,17 @@ class MentalHealthRAG:
 
         if not collection_exists or collection_empty:
             if collection_empty:
-                print(f"--> [RAG Setup] Collection '{self.collection_name}' is empty. Deleting and recreating...")
+                print(
+                    f"--> [RAG Setup] Collection '{self.collection_name}' is empty. Deleting and recreating..."
+                )
                 try:
                     self.qdrant_client.delete_collection(self.collection_name)
                 except Exception:
                     pass
 
-            print(f"--> [RAG Setup] Creating Qdrant collection '{self.collection_name}' and indexing documents...")
+            print(
+                f"--> [RAG Setup] Creating Qdrant collection '{self.collection_name}' and indexing documents..."
+            )
             if qdrant_url:
                 self.vectorstore = QdrantVectorStore.from_documents(
                     documents,
@@ -327,7 +497,9 @@ class MentalHealthRAG:
                     distance=Distance.COSINE,
                 )
         else:
-            print(f"--> [RAG Setup] Qdrant collection '{self.collection_name}' already exists. Loading index...")
+            print(
+                f"--> [RAG Setup] Qdrant collection '{self.collection_name}' already exists. Loading index..."
+            )
             self.vectorstore = QdrantVectorStore(
                 client=self.qdrant_client,
                 collection_name=self.collection_name,
@@ -340,36 +512,37 @@ class MentalHealthRAG:
         qdrant_retriever = self.vectorstore.as_retriever(search_kwargs={"k": 5})
 
         self.ensemble_retriever = EnsembleRetriever(
-            retrievers=[bm25_retriever, qdrant_retriever],
-            weights=[0.45, 0.55]
+            retrievers=[bm25_retriever, qdrant_retriever], weights=[0.45, 0.55]
         )
 
     def rerank_documents(self, query: str, docs: List[Document]) -> List[float]:
         """Rerank documents using cosine similarity of embeddings."""
         if not docs:
             return []
-            
+
         try:
             # Get query embedding
             query_emb = np.array(self.embeddings.embed_query(query), dtype=np.float32)
-            
+
             # Get document embeddings
             docs_texts = [doc.page_content for doc in docs]
-            docs_embs = np.array(self.embeddings.embed_documents(docs_texts), dtype=np.float32)
-            
+            docs_embs = np.array(
+                self.embeddings.embed_documents(docs_texts), dtype=np.float32
+            )
+
             # Calculate cosine similarity using numpy
             # Normalize vectors
             q_norm = np.linalg.norm(query_emb)
             d_norms = np.linalg.norm(docs_embs, axis=1)
-            
+
             q_norm = q_norm if q_norm > 0 else 1.0
             d_norms = np.where(d_norms > 0, d_norms, 1.0)
-            
+
             query_emb_norm = query_emb / q_norm
             docs_embs_norm = docs_embs / d_norms[:, np.newaxis]
-            
+
             cos_sim = np.dot(docs_embs_norm, query_emb_norm)
-            
+
             return [float(score) for score in cos_sim.tolist()]
         except Exception as e:
             print(f"Cosine similarity reranking error: {e}")
@@ -397,12 +570,12 @@ class MentalHealthRAG:
 
     @traceable(name="rag_query", run_type="chain")
     def query(
-        self, 
-        user_query: str, 
+        self,
+        user_query: str,
         translated_query: str | None = None,
         history: list | None = None,
         emotions: list | None = None,
-        language: str | None = None
+        language: str | None = None,
     ) -> dict:
         if not self.ensemble_retriever:
             return {"answer": "Retriever not set up.", "resources": []}
@@ -413,20 +586,28 @@ class MentalHealthRAG:
         # Guardrail: Check for prompt injection
         if detect_prompt_injection(user_query):
             from .multilingual_patterns import OUT_OF_SCOPE_RESPONSES
+
             return {
-                "answer": OUT_OF_SCOPE_RESPONSES.get(language, OUT_OF_SCOPE_RESPONSES["English"]),
-                "resources": []
+                "answer": OUT_OF_SCOPE_RESPONSES.get(
+                    language, OUT_OF_SCOPE_RESPONSES["English"]
+                ),
+                "resources": [],
             }
 
         # Guardrail: Check for medicine/prescription queries
         if detect_medicine_query(user_query):
             from .multilingual_patterns import MEDICAL_DISCLAIMERS
+
             return {
-                "answer": MEDICAL_DISCLAIMERS.get(language, MEDICAL_DISCLAIMERS["English"]),
-                "resources": []
+                "answer": MEDICAL_DISCLAIMERS.get(
+                    language, MEDICAL_DISCLAIMERS["English"]
+                ),
+                "resources": [],
             }
 
-        retrieval_query = translated_query if translated_query is not None else user_query
+        retrieval_query = (
+            translated_query if translated_query is not None else user_query
+        )
         route = "requires_retrieval"
         formatted_history = ""
 
@@ -438,13 +619,12 @@ class MentalHealthRAG:
                 content = msg.content if hasattr(msg, "content") else msg.get("content")
                 if role in ("user", "assistant"):
                     formatted_history += f"{role.capitalize()}: {content}\n"
-            
+
             if self.retrieval_router is not None:
                 try:
                     with dspy.context(lm=self.lm):
                         route = self.retrieval_router(
-                            chat_history=formatted_history,
-                            user_query=retrieval_query
+                            chat_history=formatted_history, user_query=retrieval_query
                         )
                 except Exception as e:
                     print(f"Error during retrieval routing: {e}")
@@ -459,8 +639,7 @@ class MentalHealthRAG:
                 try:
                     with dspy.context(lm=self.lm):
                         condensed = self.condense_module(
-                            chat_history=formatted_history,
-                            user_query=retrieval_query
+                            chat_history=formatted_history, user_query=retrieval_query
                         )
                     if condensed:
                         retrieval_query = condensed
@@ -480,7 +659,12 @@ class MentalHealthRAG:
                 for doc in reranked_docs[:5]
             ]
 
-            top_context = "\n\n".join([f"Context [{i+1}]: {res['response']}" for i, res in enumerate(resources[:5])])
+            top_context = "\n\n".join(
+                [
+                    f"Context [{i+1}]: {res['response']}"
+                    for i, res in enumerate(resources[:5])
+                ]
+            )
 
         if not language:
             language = "English"
@@ -507,7 +691,10 @@ class MentalHealthRAG:
         # Handle crisis response directives
         if detect_crisis(user_query):
             from .multilingual_patterns import CRITICAL_CRISIS_RESPONSES
-            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
+
+            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(
+                language, CRITICAL_CRISIS_RESPONSES["English"]
+            )
             language_instructions = f"Target response language: {language}. Respond in this language. CRITICAL CRISIS DETECTED: You MUST append exactly this helpline message at the very end of your response: '{crisis_msg}'"
         else:
             language_instructions = f"Target response language: {language}. Respond in this language. If user query language is different, respond in that language instead."
@@ -528,12 +715,18 @@ class MentalHealthRAG:
                     emotions=emotions_directives,
                     language=language_instructions,
                     chat_history=formatted_history,
-                    user_query=user_query
+                    user_query=user_query,
                 )
         except Exception as e:
             print(f"Error during grounded response generation: {e}")
             err_str = str(e).lower()
-            if "429" in err_str or "rate limit" in err_str or "too many requests" in err_str or "token" in err_str or "quota" in err_str:
+            if (
+                "429" in err_str
+                or "rate limit" in err_str
+                or "too many requests" in err_str
+                or "token" in err_str
+                or "quota" in err_str
+            ):
                 answer = "The token limit has been reached. Please wait a moment before trying again."
             else:
                 answer = "I'm sorry, I don't have enough information to answer that."
@@ -541,23 +734,20 @@ class MentalHealthRAG:
         # Safety Fallback: Ensure crisis response is appended if crisis query is detected
         if detect_crisis(user_query):
             from .multilingual_patterns import CRITICAL_CRISIS_RESPONSES
-            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(language, CRITICAL_CRISIS_RESPONSES["English"])
+
+            crisis_msg = CRITICAL_CRISIS_RESPONSES.get(
+                language, CRITICAL_CRISIS_RESPONSES["English"]
+            )
             if crisis_msg not in answer:
                 answer = f"{answer.rstrip()}\n\n{crisis_msg}"
 
         # Safeguard: Apply medical disclaimer check
         answer = check_medical_advice(answer, language)
 
-        return {
-            "answer": answer,
-            "resources": resources
-        }
+        return {"answer": answer, "resources": resources}
 
     def query_general(
-        self,
-        user_query: str,
-        history: list | None = None,
-        language: str = "English"
+        self, user_query: str, history: list | None = None, language: str = "English"
     ) -> str:
         formatted_history = ""
         if history:
@@ -573,13 +763,19 @@ class MentalHealthRAG:
                 answer = self.general_module(
                     language=language,
                     chat_history=formatted_history,
-                    user_query=user_query
+                    user_query=user_query,
                 )
             return answer
         except Exception as e:
             print(f"Error during general query generation: {e}")
             err_str = str(e).lower()
-            if "429" in err_str or "rate limit" in err_str or "too many requests" in err_str or "token" in err_str or "quota" in err_str:
+            if (
+                "429" in err_str
+                or "rate limit" in err_str
+                or "too many requests" in err_str
+                or "token" in err_str
+                or "quota" in err_str
+            ):
                 return "The token limit has been reached. Please wait a moment before trying again."
             return "Hello! I am here to support you with mental health topics. 😊"
 

@@ -2,14 +2,15 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+
 class Config:
     """Centralized configuration and path management for Serene AI."""
-    
+
     # ------------------------------------------------------------------------------
     # 1. Project Root & Environment Loading
     # ------------------------------------------------------------------------------
     _CURRENT_DIR = Path(__file__).resolve().parent
-    
+
     # Dynamically find the project root by looking for .env or pyproject.toml
     PROJECT_ROOT = None
     for _parent in [_CURRENT_DIR] + list(_CURRENT_DIR.parents):
@@ -25,18 +26,21 @@ class Config:
     else:
         load_dotenv(override=True)
 
-
     # ------------------------------------------------------------------------------
     # 2. Derived File & Directory Paths (Cross-Platform)
     # ------------------------------------------------------------------------------
     ARTIFACTS_DIR = PROJECT_ROOT / "artifacts"
     QDRANT_LOCAL_PATH = PROJECT_ROOT / "qdrant_db"
     CACHE_PATH = ARTIFACTS_DIR / "processed_docs.pkl"
-    
+
     # Model 1 (Language Detection) Paths
-    MOD1_VECTORIZER_PATH = ARTIFACTS_DIR / "langauge_detection" / "language_detection_best_vectorizer.pkl"
-    MOD1_CLASSIFIER_PATH = ARTIFACTS_DIR / "langauge_detection" / "language_detection_best_model.pkl"
-    
+    MOD1_VECTORIZER_PATH = (
+        ARTIFACTS_DIR / "langauge_detection" / "language_detection_best_vectorizer.pkl"
+    )
+    MOD1_CLASSIFIER_PATH = (
+        ARTIFACTS_DIR / "langauge_detection" / "language_detection_best_model.pkl"
+    )
+
     # Model 2 (Emotion Classifier) Paths
     MOD2_DIR = ARTIFACTS_DIR / "emotion_classifier"
     MOD2_CONFIG_PATH = MOD2_DIR / "adapter_config.json"
@@ -44,7 +48,11 @@ class Config:
     # ------------------------------------------------------------------------------
     # 3. Application Settings
     # ------------------------------------------------------------------------------
-    ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in ("true", "1", "yes")
+    ENABLE_TRANSLATION = os.getenv("ENABLE_TRANSLATION", "False").lower() in (
+        "true",
+        "1",
+        "yes",
+    )
     LANGUAGE_DETECTION_MAX_LEN = 300
 
     # ------------------------------------------------------------------------------
@@ -71,6 +79,7 @@ class Config:
     # ------------------------------------------------------------------------------
     SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-change-me")
     CHAT_DATABASE_PATH = ARTIFACTS_DIR / "chat_interactions.sqlite3"
+
 
 # Expose a singleton instance
 config = Config()

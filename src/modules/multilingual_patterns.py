@@ -11,9 +11,26 @@ import re
 
 # 20 supported language names matching language_detector.py keys
 LANGUAGES = [
-    "Arabic", "Bulgarian", "German", "Greek", "English", "Spanish", "French", 
-    "Hindi", "Italian", "Japanese", "Dutch", "Polish", "Portuguese", "Russian", 
-    "Swahili", "Thai", "Turkish", "Urdu", "Vietnamese", "Chinese"
+    "Arabic",
+    "Bulgarian",
+    "German",
+    "Greek",
+    "English",
+    "Spanish",
+    "French",
+    "Hindi",
+    "Italian",
+    "Japanese",
+    "Dutch",
+    "Polish",
+    "Portuguese",
+    "Russian",
+    "Swahili",
+    "Thai",
+    "Turkish",
+    "Urdu",
+    "Vietnamese",
+    "Chinese",
 ]
 # Multilingual greeting patterns by language for exact language matching
 GREETING_PATTERNS_BY_LANG = {
@@ -21,8 +38,24 @@ GREETING_PATTERNS_BY_LANG = {
     "Bulgarian": [r"здравей", r"здравейте", r"добър\s*ден"],
     "German": [r"hallo", r"guten\s*tag", r"hi", r"grüß\s*gott"],
     "Greek": [r"γεια", r"χαίρετε", r"καλημέρα"],
-    "English": [r"hello", r"hi", r"hey", r"greetings", r"good\s*morning", r"good\s*afternoon", r"good\s*evening", r"hiya", r"welcome"],
-    "Spanish": [r"hola", r"buenos\s*días", r"buenos\s*dias", r"buenas\s*tardes", r"buenas\s*noches"],
+    "English": [
+        r"hello",
+        r"hi",
+        r"hey",
+        r"greetings",
+        r"good\s*morning",
+        r"good\s*afternoon",
+        r"good\s*evening",
+        r"hiya",
+        r"welcome",
+    ],
+    "Spanish": [
+        r"hola",
+        r"buenos\s*días",
+        r"buenos\s*dias",
+        r"buenas\s*tardes",
+        r"buenas\s*noches",
+    ],
     "French": [r"bonjour", r"salut", r"bonsoir", r"coucou"],
     "Hindi": [r"नमस्ते", r"नमस्कार", r"हैलो"],
     "Italian": [r"ciao", r"salve", r"buongiorno"],
@@ -36,7 +69,7 @@ GREETING_PATTERNS_BY_LANG = {
     "Turkish": [r"merhaba", r"selam", r"günaydın", r"gunaydin"],
     "Urdu": [r"ہیلو", r"السلام\s*علیکم", r"آداب"],
     "Vietnamese": [r"xin\s*chào", r"xin\s*chao", r"chào\s*bạn", r"chao\s*ban"],
-    "Chinese": [r"你好", r"您好", r"早上好", r"下午好", r"晚上好"]
+    "Chinese": [r"你好", r"您好", r"早上好", r"下午好", r"晚上好"],
 }
 
 # Multilingual goodbye patterns by language for exact language matching
@@ -57,10 +90,22 @@ GOODBYE_PATTERNS_BY_LANG = {
     "Russian": [r"пока", r"до\s*свидания", r"до\s*встречи"],
     "Swahili": [r"kwa\s*heri", r"tutaonana"],
     "Thai": [r"ลาก่อน"],
-    "Turkish": [r"hoşça\s*kal", r"hosca\s*kal", r"güle\s*güle", r"gule\s*gule", r"görüşürüz", r"gorusuruz"],
+    "Turkish": [
+        r"hoşça\s*kal",
+        r"hosca\s*kal",
+        r"güle\s*güle",
+        r"gule\s*gule",
+        r"görüşürüz",
+        r"gorusuruz",
+    ],
     "Urdu": [r"خدا\s*حافظ", r"الوداع"],
-    "Vietnamese": [r"tạm\s*biệt", r"tam\s*biet", r"hẹn\s*gặp\s*lại", r"hen\s*gap\s*lai"],
-    "Chinese": [r"再见", r"拜拜"]
+    "Vietnamese": [
+        r"tạm\s*biệt",
+        r"tam\s*biet",
+        r"hẹn\s*gặp\s*lại",
+        r"hen\s*gap\s*lai",
+    ],
+    "Chinese": [r"再见", r"拜拜"],
 }
 
 # Multilingual gratitude patterns by language for exact language matching
@@ -81,10 +126,17 @@ GRATITUDE_PATTERNS_BY_LANG = {
     "Russian": [r"спасибо", r"благодарю"],
     "Swahili": [r"asante", r"asante\s*sana"],
     "Thai": [r"ขอบคุณ", r"ขอบใจ"],
-    "Turkish": [r"teşekkürler", r"tesekkurler", r"teşekkür\s*ederim", r"tesekkur\s*ederim", r"sağol", r"sagol"],
+    "Turkish": [
+        r"teşekkürler",
+        r"tesekkurler",
+        r"teşekkür\s*ederim",
+        r"tesekkur\s*ederim",
+        r"sağol",
+        r"sagol",
+    ],
     "Urdu": [r"شکریہ", r"بہت\s*شکریہ"],
     "Vietnamese": [r"cảm\s*ơn", r"cam\s*on", r"cám\s*ơn", r"cam\s*on\s*ban"],
-    "Chinese": [r"谢谢", r"谢谢你"]
+    "Chinese": [r"谢谢", r"谢谢你"],
 }
 
 # Flatten lists to maintain backward compatibility
@@ -101,9 +153,15 @@ for patterns in GRATITUDE_PATTERNS_BY_LANG.values():
     GRATITUDE_PATTERNS.extend(patterns)
 
 # Compile flat regex patterns
-GREETING_REGEX = re.compile(r"^(" + "|".join(GREETING_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
-GOODBYE_REGEX = re.compile(r"^(" + "|".join(GOODBYE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
-GRATITUDE_REGEX = re.compile(r"^(" + "|".join(GRATITUDE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE)
+GREETING_REGEX = re.compile(
+    r"^(" + "|".join(GREETING_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE
+)
+GOODBYE_REGEX = re.compile(
+    r"^(" + "|".join(GOODBYE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE
+)
+GRATITUDE_REGEX = re.compile(
+    r"^(" + "|".join(GRATITUDE_PATTERNS) + r")(\s+.*)?$", re.IGNORECASE
+)
 
 # Compile language-specific regex patterns
 GREETING_REGEX_BY_LANG = {
@@ -141,7 +199,7 @@ GREETING_RESPONSES = {
     "Turkish": "Merhaba! Size destek olmak için buradayım. Bugün size nasıl yardımcı olabilirim?",
     "Urdu": "ہیلو! میں آپ کی مدد کے لیے حاضر ہوں۔ آج میں آپ کی کیا مدد کر سکتا ہوں؟",
     "Vietnamese": "Xin chào! Tôi ở đây để hỗ trợ bạn. Tôi có thể giúp gì cho bạn hôm nay?",
-    "Chinese": "你好！我在这里为您提供支持。今天有什么我可以帮您的吗？"
+    "Chinese": "你好！我在这里为您提供支持。今天有什么我可以帮您的吗？",
 }
 
 GOODBYE_RESPONSES = {
@@ -164,7 +222,7 @@ GOODBYE_RESPONSES = {
     "Turkish": "Hoşça kalın! Kendinize iyi bakın. Desteğe ihtiyaç duyduğunuzda her zaman buradayım.",
     "Urdu": "خدا حافظ! اپنا خیال رکھیں۔ جب بھی آپ کو مدد کی ضرورت ہو، میں ہمیشہ یہاں موجود ہوں۔",
     "Vietnamese": "Tạm biệt! Hãy chăm sóc bản thân thật tốt. Tôi luôn ở đây nếu bạn cần hỗ trợ.",
-    "Chinese": "再见！请照顾好自己。如果您需要支持，我随时都在这里。"
+    "Chinese": "再见！请照顾好自己。如果您需要支持，我随时都在这里。",
 }
 
 GRATITUDE_RESPONSES = {
@@ -187,7 +245,7 @@ GRATITUDE_RESPONSES = {
     "Turkish": "Rica ederim! Yardımcı olabildiğinh için çok mutluyum. Desteğe ihtiyaç duyduğunuzda çekinmeden gelebilirsiniz.",
     "Urdu": "خوش آمدید! مجھے خوشی ہے کہ میں آپ کی مدد کر سکا۔ کسی بھی وقت دوبارہ رابطہ کرنے میں ہچکچاہٹ محسوس نہ کریں۔",
     "Vietnamese": "Không có gì! Tôi rất vui được giúp đỡ bạn. Đừng ngần ngại quay lại bất cứ khi nào bạn cần.",
-    "Chinese": "不用谢！很高兴能帮到您。需要支持时，请随时回来。"
+    "Chinese": "不用谢！很高兴能帮到您。需要支持时，请随时回来。",
 }
 
 # Critical self-harm/crisis support helpline templates for each language
@@ -211,7 +269,7 @@ CRITICAL_CRISIS_RESPONSES = {
     "Turkish": "Bir kriz içindeyseniz veya kendinize zarar vermeyi düşünüyorsanız lütfen hemen yardım isteyin. 182 nolu hattı arayabilir ya da en yakın acil servise başvurabilirsiniz.",
     "Urdu": "اگر آپ کسی مشکل میں ہیں یا خود کو نقصان پہنچانے کے بارے میں سوچ رہے ہیں، تو براہ کرم فوری مدد حاصل کریں۔ آپ مقامی ہیلپ لائن سے رابطہ کر سکتے ہیں یا قریبی ہسپتال جا سکتے ہیں۔",
     "Vietnamese": "Nếu bạn đang gặp khủng hoảng hoặc có ý định tự hại, vui lòng tìm kiếm sự giúp đỡ ngay lập tức. Hãy gọi đường dây nóng hỗ trợ tâm lý hoặc đến phòng cấp cứu gần nhất.",
-    "Chinese": "如果您正处于危机之中或有自残想法，请立即寻求帮助。您可以拨打心理援助热线（如 988 或 400-161-9995）或前往最近的急诊室。"
+    "Chinese": "如果您正处于危机之中或有自残想法，请立即寻求帮助。您可以拨打心理援助热线（如 988 或 400-161-9995）或前往最近的急诊室。",
 }
 
 # Redirect responses for out-of-scope queries in all 20 languages
@@ -235,7 +293,7 @@ OUT_OF_SCOPE_RESPONSES = {
     "Turkish": "Ben psikolojik destek ve ruh sağlığı asistanıyım. Sadece duygusal ve psikolojik esenlikle ilgili konularda yardımcı olabilirim. Bugün bu alanda size nasıl destek olabilirim?",
     "Urdu": "میں ذہنی صحت کا ایک سرشار معاون ہوں۔ میں صرف جذباتی اور نفسیاتی بہبود سے متعلق سوالات میں مدد کر سکتا ہوں۔ آج میں اس شعبے میں آپ کی کیا مدد کر سکتا ہوں؟",
     "Vietnamese": "Tôi là trợ lý chuyên hỗ trợ sức khỏe tâm thần. Tôi chỉ có thể giúp đỡ các câu hỏi liên quan đến sức khỏe cảm xúc và tâm lý. Tôi có thể hỗ trợ bạn như thế nào trong lĩnh vực đó hôm nay?",
-    "Chinese": "我是专门的心理健康支持助手。我只能协助解决与情感和心理健康相关的问题。今天我能在该领域为您提供什么支持吗？"
+    "Chinese": "我是专门的心理健康支持助手。我只能协助解决与情感和心理健康相关的问题。今天我能在该领域为您提供什么支持吗？",
 }
 
 # Localized medical advice/prescriptions disclaimers for all 20 languages
@@ -259,5 +317,5 @@ MEDICAL_DISCLAIMERS = {
     "Turkish": "Not: Ben bir yapay zeka asistanıyım ve ilaç reçete edemem veya tıbbi tavsiye veremem. Lütfen uzman bir doktora danışın.",
     "Urdu": "نوٹ: میں ایک اے آئی معاون ہوں اور ادویات تجویز کرنے یا طبی مشورہ دینے کا اہل نہیں ہوں۔ براہ کرم کسی مستند ڈاکٹر سے رجوع کریں۔",
     "Vietnamese": "Lưu ý: Tôi là trợ lý AI và không thể kê đơn thuốc hoặc tư vấn y tế. Vui lòng tham khảo ý kiến bác sĩ chuyên khoa.",
-    "Chinese": "注意：我是AI助手，不能开具处方或提供医疗建议。请咨询合格的医生或精神科医生。"
+    "Chinese": "注意：我是AI助手，不能开具处方或提供医疗建议。请咨询合格的医生或精神科医生。",
 }

@@ -1,16 +1,15 @@
 import unittest
 from unittest.mock import MagicMock, patch
-import numpy as np
-from src.router import route_query, get_direct_greeting
+from src.router import route_query
 from src.modules.rag import detect_crisis
 
-class TestRouter(unittest.IsolatedAsyncioTestCase):
 
+class TestRouter(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.mock_rag = MagicMock()
         # Mock embeddings
         self.mock_rag.embeddings = MagicMock()
-        
+
     async def test_direct_greeting_short_input(self):
         """Test that short greeting queries return direct greeting response immediately."""
         queries = ["hi", "hello", "مرحبا", "bonjour", "hola", "hey there"]
@@ -26,58 +25,74 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
         """Test that short greetings in different languages resolve to the correct language greeting response."""
         test_cases = [
             ("hola", "¡Hola! Estoy aquí para apoyarte."),  # Spanish
-            ("مرحبا", "مرحباً! أنا هنا لدعمك ومساعدتك."),    # Arabic
-            ("hi", "Hello! I am here to support you."),     # English
-            ("hallo", "Hallo! Ich bin hier, um Sie zu unterstützen.") # German
+            ("مرحبا", "مرحباً! أنا هنا لدعمك ومساعدتك."),  # Arabic
+            ("hi", "Hello! I am here to support you."),  # English
+            ("hallo", "Hallo! Ich bin hier, um Sie zu unterstützen."),  # German
         ]
         for query, expected_start in test_cases:
             result = await route_query(query, self.mock_rag)
             self.assertEqual(result["intent"], "greeting")
-            self.assertTrue(result["answer"].startswith(expected_start), f"Failed for query '{query}': got '{result['answer']}'")
+            self.assertTrue(
+                result["answer"].startswith(expected_start),
+                f"Failed for query '{query}': got '{result['answer']}'",
+            )
 
     async def test_goodbye_correct_language_resolution(self):
         """Test that short goodbyes in different languages resolve to the correct language goodbye response."""
         test_cases = [
-            ("adios", "¡Adiós! Cuídate mucho."), # Spanish
-            ("مع السلامة", "مع السلامة! أتمنى لك يوماً هادئاً"), # Arabic
-            ("bye", "Goodbye! Take care of yourself.") # English
+            ("adios", "¡Adiós! Cuídate mucho."),  # Spanish
+            ("مع السلامة", "مع السلامة! أتمنى لك يوماً هادئاً"),  # Arabic
+            ("bye", "Goodbye! Take care of yourself."),  # English
         ]
         for query, expected_start in test_cases:
             result = await route_query(query, self.mock_rag)
             self.assertEqual(result["intent"], "goodbye")
-            self.assertTrue(result["answer"].startswith(expected_start), f"Failed for query '{query}': got '{result['answer']}'")
+            self.assertTrue(
+                result["answer"].startswith(expected_start),
+                f"Failed for query '{query}': got '{result['answer']}'",
+            )
 
     async def test_gratitude_correct_language_resolution(self):
         """Test that short gratitude messages in different languages resolve to the correct language gratitude response."""
         test_cases = [
-            ("gracias", "¡De nada! Me alegra haber podido ayudarte."), # Spanish
-            ("شكرا", "العفو! يسعدني أنني استطعت مساعدتك."), # Arabic
-            ("thank you", "You're welcome! I'm glad I could help.") # English
+            ("gracias", "¡De nada! Me alegra haber podido ayudarte."),  # Spanish
+            ("شكرا", "العفو! يسعدني أنني استطعت مساعدتك."),  # Arabic
+            ("thank you", "You're welcome! I'm glad I could help."),  # English
         ]
         for query, expected_start in test_cases:
             result = await route_query(query, self.mock_rag)
             self.assertEqual(result["intent"], "gratitude")
-            self.assertTrue(result["answer"].startswith(expected_start), f"Failed for query '{query}': got '{result['answer']}'")
+            self.assertTrue(
+                result["answer"].startswith(expected_start),
+                f"Failed for query '{query}': got '{result['answer']}'",
+            )
 
-
-    @patch('src.router.detect_language')
-    @patch('src.router.classify_emotion')
-    @patch('src.router.classify_intent')
-    async def test_mental_health_routing_pipeline(self, mock_intent, mock_emotion, mock_lang):
+    @patch("src.router.detect_language")
+    @patch("src.router.classify_emotion")
+    @patch("src.router.classify_intent")
+    async def test_mental_health_routing_pipeline(
+        self, mock_intent, mock_emotion, mock_lang
+    ):
         """Test that mental health related queries run the full classification and RAG pipeline."""
         mock_lang.return_value = "Arabic"
         mock_emotion.return_value = ["Sadness", "Fear"]
         mock_intent.return_value = "asking_mental_health_question"
-        
+
         # Mock RAG query
         self.mock_rag.query.return_value = {
             "answer": "أنا أفهم شعورك بالخوف والحزن.",
-            "resources": [{"score": 0.9, "page_content": "dummy", "response": "counselor response"}]
+            "resources": [
+                {
+                    "score": 0.9,
+                    "page_content": "dummy",
+                    "response": "counselor response",
+                }
+            ],
         }
-        
+
         query = "أشعر بحزن شديد وخوف من المستقبل"
         result = await route_query(query, self.mock_rag)
-        
+
         self.assertEqual(result["language"], "Arabic")
         self.assertEqual(result["emotion"], ["Sadness", "Fear"])
         self.assertEqual(result["intent"], "asking_mental_health_question")
@@ -85,25 +100,27 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(result["resources"]), 1)
         self.mock_rag.query.assert_called_once()
 
-    @patch('src.router.detect_language')
-    @patch('src.router.classify_emotion')
-    @patch('src.router.classify_intent')
-    async def test_short_non_greeting_no_padding(self, mock_intent, mock_emotion, mock_lang):
+    @patch("src.router.detect_language")
+    @patch("src.router.classify_emotion")
+    @patch("src.router.classify_intent")
+    async def test_short_non_greeting_no_padding(
+        self, mock_intent, mock_emotion, mock_lang
+    ):
         """Verify that short non-greeting queries are not padded before language detection."""
         mock_lang.return_value = "English"
         mock_emotion.return_value = ["Sadness"]
         mock_intent.return_value = "asking_mental_health_question"
-        
+
         self.mock_rag.query.return_value = {
             "answer": "Supportive response",
-            "resources": []
+            "resources": [],
         }
-        
+
         # Test case 1: small query (1 word) -> should not be padded
         query_short = "sad"
         await route_query(query_short, self.mock_rag)
         mock_lang.assert_called_with("sad")
-        
+
         # Test case 2: long query (6 words) -> should not be padded
         mock_lang.reset_mock()
         query_long = "I feel extremely sad and hopeless"
@@ -117,46 +134,45 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(detect_crisis("I want to end my life"))
         self.assertFalse(detect_crisis("I am feeling a bit stressed from work"))
 
-
-
-    @patch('src.router.detect_language')
-    @patch('src.router.classify_emotion')
-    @patch('src.router.classify_intent')
+    @patch("src.router.detect_language")
+    @patch("src.router.classify_emotion")
+    @patch("src.router.classify_intent")
     async def test_out_of_scope_routing(self, mock_intent, mock_emotion, mock_lang):
         """Test that out_of_scope queries get politely redirected in user's language."""
         mock_lang.return_value = "French"
         mock_emotion.return_value = []
         mock_intent.return_value = "out_of_scope"
-        
+
         query = "Comment cuisiner des pâtes ?"
         result = await route_query(query, self.mock_rag)
-        
+
         self.assertEqual(result["intent"], "out_of_scope")
         self.assertEqual(result["language"], "French")
-        self.assertIn("santé mentale", result["answer"]) # French redirect message
+        self.assertIn("santé mentale", result["answer"])  # French redirect message
 
-    @patch('src.router.detect_language')
-    @patch('src.router.classify_emotion')
-    @patch('src.router.classify_intent')
-    async def test_conversational_routing_pipeline(self, mock_intent, mock_emotion, mock_lang):
+    @patch("src.router.detect_language")
+    @patch("src.router.classify_emotion")
+    @patch("src.router.classify_intent")
+    async def test_conversational_routing_pipeline(
+        self, mock_intent, mock_emotion, mock_lang
+    ):
         """Test that conversational queries (greetings in Layer 2) use query_general on RAG."""
         mock_lang.return_value = "English"
         mock_emotion.return_value = []
         mock_intent.return_value = "greeting"
-        
+
         self.mock_rag.query_general.return_value = "Hello! Nice to meet you."
-        
+
         query = "hello my name is mazen"
         result = await route_query(query, self.mock_rag)
-        
+
         self.assertEqual(result["intent"], "greeting")
         self.assertEqual(result["answer"], "Hello! Nice to meet you.")
         self.assertEqual(result["resources"], [])
         self.mock_rag.query_general.assert_called_once_with(
-            user_query=query,
-            history=None,
-            language="English"
+            user_query=query, history=None, language="English"
         )
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     unittest.main()

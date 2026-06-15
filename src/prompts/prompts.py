@@ -5,10 +5,11 @@ from pathlib import Path
 # INTENT CLASSIFIER PROMPTS
 # ==============================================================================
 
+
 class IntentClassifierSignature(dspy.Signature):
     """You are a strict intent classification engine for a mental-health support assistant.
     Classify the user's message into exactly one label: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis.
-    
+
     Guidelines:
     - greeting: for greeting, introduction, small talk (e.g. sharing or asking about names, how are you).
     - goodbye: for farewell and parting words.
@@ -19,16 +20,22 @@ class IntentClassifierSignature(dspy.Signature):
     """
 
     text = dspy.InputField(desc="The user message to classify")
-    type = dspy.OutputField(desc="exactly one of: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis")
-    confidence = dspy.OutputField(desc="confidence score of the intent classification, between 0.0 and 1.0")
+    type = dspy.OutputField(
+        desc="exactly one of: greeting, goodbye, gratitude, out_of_scope, asking_mental_health_question, or crisis"
+    )
+    confidence = dspy.OutputField(
+        desc="confidence score of the intent classification, between 0.0 and 1.0"
+    )
 
 
 class IntentClassifierModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.classify = dspy.Predict(IntentClassifierSignature)
-        
-        optimized_path = Path("artifacts/dspy optimized prompts/intent_classifier_optimized.json")
+
+        optimized_path = Path(
+            "artifacts/dspy optimized prompts/intent_classifier_optimized.json"
+        )
         if optimized_path.exists():
             try:
                 self.load(str(optimized_path))
@@ -37,39 +44,45 @@ class IntentClassifierModule(dspy.Module):
 
     def forward(self, text: str) -> dict:
         pred = self.classify(text=text)
-        
+
         pred_type = str(pred.type).strip().strip('"').strip("'").lower()
         valid_types = {
-            "greeting", "goodbye", "gratitude", 
-            "out_of_scope", "asking_mental_health_question", "crisis"
+            "greeting",
+            "goodbye",
+            "gratitude",
+            "out_of_scope",
+            "asking_mental_health_question",
+            "crisis",
         }
         if pred_type not in valid_types:
             pred_type = "greeting"
-            
+
         try:
-            conf_str = "".join(c for c in str(pred.confidence) if c.isdigit() or c == '.')
+            conf_str = "".join(
+                c for c in str(pred.confidence) if c.isdigit() or c == "."
+            )
             pred_conf = float(conf_str)
         except (ValueError, TypeError):
             pred_conf = 0.65
-            
+
         pred_conf = max(0.0, min(1.0, pred_conf))
-        
-        return {
-            "type": pred_type,
-            "confidence": pred_conf,
-            "classifier": "llm"
-        }
+
+        return {"type": pred_type, "confidence": pred_conf, "classifier": "llm"}
+
 
 # ==============================================================================
 # RAG PIPELINE PROMPTS
 # ==============================================================================
 
+
 class RetrievalRouterSignature(dspy.Signature):
     """Classify if the user's latest query refers to previous chat history (e.g., asking about what they said, their name, their personal details, or what was discussed) and can be answered using only the chat history, or if it asks a new mental health/counseling question that requires retrieving external medical/support document resources."""
-    
-    chat_history = dspy.InputField(desc="Pruned recent chat turns between user and assistant")
+
+    chat_history = dspy.InputField(
+        desc="Pruned recent chat turns between user and assistant"
+    )
     user_query = dspy.InputField(desc="The user's latest query")
-    
+
     route = dspy.OutputField(desc="exactly 'history_only' or 'requires_retrieval'")
 
 
@@ -77,7 +90,7 @@ class RetrievalRouterModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.route_predict = dspy.Predict(RetrievalRouterSignature)
-        
+
         optimized_path = Path("artifacts/dspy optimized prompts/router_optimized.json")
         if optimized_path.exists():
             try:
@@ -98,18 +111,22 @@ class QueryCondenserSignature(dspy.Signature):
     formulate a standalone question which can be understood without the chat history.
     The standalone question MUST be written in English. Do NOT answer the question, just reformulate it
     and output ONLY the standalone question."""
-    
+
     chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
     user_query = dspy.InputField(desc="The latest user question/query")
-    condensed_query = dspy.OutputField(desc="A standalone question in English representing the query in history context")
+    condensed_query = dspy.OutputField(
+        desc="A standalone question in English representing the query in history context"
+    )
 
 
 class QueryCondenserModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.condense = dspy.Predict(QueryCondenserSignature)
-        
-        optimized_path = Path("artifacts/dspy optimized prompts/condenser_optimized.json")
+
+        optimized_path = Path(
+            "artifacts/dspy optimized prompts/condenser_optimized.json"
+        )
         if optimized_path.exists():
             try:
                 self.load(str(optimized_path))
@@ -143,34 +160,51 @@ class GroundedResponseSignature(dspy.Signature):
     - Adjust tone implicitly according to the user's emotions and directives. Do not label their emotions explicitly.
     """
 
-    contexts = dspy.InputField(desc="Retrieved counseling case contexts, formatted as Context [1], Context [2], Context [3]")
-    emotions = dspy.InputField(desc="User's detected emotional state and tone directives")
-    language = dspy.InputField(desc="Detected language and translation/actual query language instructions")
+    contexts = dspy.InputField(
+        desc="Retrieved counseling case contexts, formatted as Context [1], Context [2], Context [3]"
+    )
+    emotions = dspy.InputField(
+        desc="User's detected emotional state and tone directives"
+    )
+    language = dspy.InputField(
+        desc="Detected language and translation/actual query language instructions"
+    )
     chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
     user_query = dspy.InputField(desc="The user's query/message")
-    
-    answer = dspy.OutputField(desc="Empathetic, grounded response matching language/tone directives and citations")
+
+    answer = dspy.OutputField(
+        desc="Empathetic, grounded response matching language/tone directives and citations"
+    )
 
 
 class GroundedResponseModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.generate = dspy.ChainOfThought(GroundedResponseSignature)
-        
-        optimized_path = Path("artifacts/dspy optimized prompts/grounded_response_optimized.json")
+
+        optimized_path = Path(
+            "artifacts/dspy optimized prompts/grounded_response_optimized.json"
+        )
         if optimized_path.exists():
             try:
                 self.load(str(optimized_path))
             except Exception:
                 pass
 
-    def forward(self, contexts: str, emotions: str, language: str, chat_history: str, user_query: str) -> str:
+    def forward(
+        self,
+        contexts: str,
+        emotions: str,
+        language: str,
+        chat_history: str,
+        user_query: str,
+    ) -> str:
         res = self.generate(
             contexts=contexts,
             emotions=emotions,
             language=language,
             chat_history=chat_history,
-            user_query=user_query
+            user_query=user_query,
         )
         return str(res.answer).strip()
 
@@ -183,20 +217,24 @@ class GeneralConversationSignature(dspy.Signature):
     If they ask for their name, tell them their name if it was mentioned.
     Keep your response concise, to exactly 1-3 sentences. Do not offer clinical advice here; just be warm, welcoming, and supportive.
     """
-    
+
     language = dspy.InputField(desc="The user's language")
     chat_history = dspy.InputField(desc="Recent chat turns between user and assistant")
     user_query = dspy.InputField(desc="The user's query/greeting")
-    
-    answer = dspy.OutputField(desc="Warm, friendly conversational response in the user's language (1-3 sentences)")
+
+    answer = dspy.OutputField(
+        desc="Warm, friendly conversational response in the user's language (1-3 sentences)"
+    )
 
 
 class GeneralConversationModule(dspy.Module):
     def __init__(self):
         super().__init__()
         self.respond = dspy.Predict(GeneralConversationSignature)
-        
-        optimized_path = Path("artifacts/dspy optimized prompts/general_conversation_optimized.json")
+
+        optimized_path = Path(
+            "artifacts/dspy optimized prompts/general_conversation_optimized.json"
+        )
         if optimized_path.exists():
             try:
                 self.load(str(optimized_path))
@@ -204,5 +242,7 @@ class GeneralConversationModule(dspy.Module):
                 pass
 
     def forward(self, language: str, chat_history: str, user_query: str) -> str:
-        res = self.respond(language=language, chat_history=chat_history, user_query=user_query)
+        res = self.respond(
+            language=language, chat_history=chat_history, user_query=user_query
+        )
         return str(res.answer).strip()

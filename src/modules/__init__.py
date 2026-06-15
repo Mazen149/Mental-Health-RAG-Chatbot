@@ -5,7 +5,7 @@ Exposes key modules and convenience wrappers with signatures compatible with rou
 
 from .language_detector import LanguageDetector
 from .emotion_classifier import EmotionClassifier
-from .intent_classifier import IntentClassifier, IntentRouter
+from .intent_classifier import IntentClassifier
 
 # Lazy singletons for the convenience functions
 _language_detector = None
@@ -36,10 +36,10 @@ def classify_emotion(text: str) -> list[str]:
     if _emotion_classifier is None:
         _emotion_classifier = EmotionClassifier()
     res = _emotion_classifier.predict(text)
-    
+
     emotion = res.get("emotion", "Sadness")
     confidence = res.get("confidence", 0.0)
-    
+
     if confidence >= 0.70:
         return [emotion]
     else:
@@ -48,7 +48,7 @@ def classify_emotion(text: str) -> list[str]:
         sorted_scores = sorted(
             [(k, v) for k, v in all_scores.items() if k != emotion],
             key=lambda x: x[1],
-            reverse=True
+            reverse=True,
         )
         if sorted_scores:
             second_emotion = sorted_scores[0][0]

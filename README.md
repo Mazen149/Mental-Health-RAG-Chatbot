@@ -135,6 +135,20 @@ Mental-Health-RAG-Chatbot/
 ├── team_members.txt                  # Contributors list
 ├── README.md                         # Project documentation
 │
+├── .github/                          # CI/CD Workflows
+│   └── workflows/
+│       └── deploy.yml                # Automated test, build, and EC2 SSH deployment
+│
+├── terraform/                        # Modular AWS Infrastructure-as-Code
+│   ├── main.tf                       # Root wiring module
+│   ├── variables.tf                  # Root-level variables (AWS region, instance type, etc.)
+│   ├── outputs.tf                    # Root-level outputs (public IP, URL)
+│   ├── terraform.tfvars              # Configured values (gitignored)
+│   └── modules/
+│       ├── networking/               # VPC, Subnet, IGW, Route Table definitions
+│       ├── security/                 # Security Group definitions (Ports 22 & 8000)
+│       └── compute/                  # EC2 Instance & user_data Docker bootstrap
+│
 ├── src/                              # Source code directory
 │   ├── __init__.py                   # Package initialization
 │   ├── app.py                        # FastAPI web server, auth sqlite database, STT and chatbot routes
@@ -244,6 +258,14 @@ LANGCHAIN_PROJECT="serene_ai"
 
 ## 🚀 Getting Started
 
+### 🐳 Docker Hub Image (Recommended)
+The pre-built Docker image is available on Docker Hub. You can pull and run it directly:
+```powershell
+docker pull mazen1393/sanad-ai-backend:latest
+docker run --env-file .env -p 8000:8000 mazen1393/sanad-ai-backend:latest
+```
+
+### Local Setup
 We recommend using [uv](https://github.com/astral-sh/uv) to manage project dependencies and virtual environments.
 
 ### 1. Install Dependencies
@@ -278,6 +300,83 @@ Verify routing, pipeline configurations, and classifier modules:
 ```powershell
 uv run pytest
 ```
+
+---
+
+## ☁️ AWS Cloud Deployment (Terraform & CI/CD)
+
+The application is deployed on a cost-effective, cloud-ready AWS infrastructure provisioned using **Terraform (modularized)** and fully automated using a **GitHub Actions CI/CD pipeline**.
+
+### 🏗️ Infrastructure Architecture (Terraform)
+The infrastructure is modularized into three separate components:
+1. **Networking Module (`terraform/modules/networking`)**: 
+   * Sets up a dedicated **VPC** (`10.0.0.0/16`) to isolate the application.
+   * Provisions a **Public Subnet** (`10.0.1.0/24`) in `eu-central-1a`.
+   * Attaches an **Internet Gateway** and configures public **Route Tables** for inbound/outbound internet routing.
+2. **Security Module (`terraform/modules/security`)**:
+   * Creates a **Security Group** acting as a virtual firewall.
+   * Open Ingress Ports: **22** (SSH for CI/CD updates) and **8000** (FastAPI HTTP web traffic).
+   * Egress: Allows all outbound traffic for dynamic ML artifact downloading from Hugging Face.
+3. **Compute Module (`terraform/modules/compute`)**:
+   * Provisions an **EC2 `t3.micro`** instance (running Amazon Linux 2023).
+   * Installs **Docker** and registers the container as a system service.
+   * Creates and mounts a **2 GB Swap File** (this allows the backend to handle ONNX model extraction and first-time Hugging Face downloads on standard free-tier/low-memory RAM configurations without getting out-of-memory killed).
+
+---
+
+### 🔄 CI/CD Pipeline Workflow (GitHub Actions)
+The automation workflow defined in `.github/workflows/deploy.yml` triggers on pushes/pull requests to the `main` branch:
+
+```mermaid
+graph TD
+    A[Code Push to main] --> B[Stage 1: Run pytest Unit Tests]
+    B -->|Passed| C[Stage 2: Build & Push Docker Image]
+    C -->|Pushed to Docker Hub| D[Stage 3: SSH Deploy to EC2]
+    D -->|Exec Script| E[Pull Image & Write .env]
+    E --> F[Restart Docker Container & Health Check]
+```
+
+* **Stage 1 (Test)**: Installs `uv` package manager, restores project dependency versions, and executes unit tests using `pytest` to guarantee code reliability before staging.
+* **Stage 2 (Build & Push)**: Builds the optimized multi-stage Docker image and pushes it to Docker Hub, tagged with the build's Git Commit SHA and `latest`.
+* **Stage 3 (Deploy)**: Connects securely via SSH to the target EC2 instance, downloads the new image, updates the application `.env` configurations from repository Secrets, launches the container (restarting automatically if stopped), and loops a local curl command until `/health` returns status code `200`.
+
+---
+
+### 🚀 Getting Started with Deployment
+
+#### 1. Setup GitHub Actions Secrets
+In your GitHub repository, go to **Settings > Secrets and variables > Actions** and add the following repository secrets:
+* `DOCKER_USERNAME`: Your Docker Hub username.
+* `DOCKER_PASSWORD`: Your Docker Hub access token/password.
+* `AWS_ACCESS_KEY_ID`: AWS Access Key to execute Terraform commands.
+* `AWS_SECRET_ACCESS_KEY`: AWS Secret Access Key.
+* `EC2_SSH_PRIVATE_KEY`: The raw private key (usually `.pem` file) matching the key pair assigned to the EC2 instance.
+* `ENV_FILE_CONTENT`: The exact values of your production `.env` configuration file (with API keys).
+* `EC2_HOST`: The Public IP address of the EC2 instance (obtained after running Terraform).
+
+#### 2. Provision Infrastructure
+Initialize and apply the Terraform root configuration:
+```powershell
+cd terraform
+# Initialize provider plugins
+terraform init
+
+# Validate configuration format
+terraform validate
+
+# Provision the environment
+terraform apply
+```
+Once complete, Terraform will output the EC2 public IP. Copy this value and add it as the `EC2_HOST` secret in GitHub.
+
+#### 3. Push and Deploy
+Commit the infrastructure files and push to GitHub:
+```powershell
+git add .
+git commit -m "feat(infra): add modularized Terraform configurations and GitHub Actions CI/CD pipeline"
+git push origin main
+```
+The GitHub Action will automate the rest of the build, push, configurations writing, and container boot-up. Open `http://<EC2_PUBLIC_IP>:8000` to access the running chatbot.
 
 ---
 

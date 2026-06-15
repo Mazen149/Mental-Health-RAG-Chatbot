@@ -38,15 +38,14 @@ ENABLE_TRANSLATION = config.ENABLE_TRANSLATION
 # ------------------------------------------------------------------------------
 # 2. Global Utilities & Helper Functions
 # ------------------------------------------------------------------------------
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 def safe_print(msg: str) -> None:
-    """Safe console logging print that handles UnicodeEncodeError on Windows command line."""
-    try:
-        print(msg)
-    except UnicodeEncodeError:
-        try:
-            print(msg.encode("ascii", errors="replace").decode("ascii"))
-        except Exception:
-            pass
+    """Safe console logging print."""
+    logger.info(msg)
 
 
 # Translation Model Pipeline Global

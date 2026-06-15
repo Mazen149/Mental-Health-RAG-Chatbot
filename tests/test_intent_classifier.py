@@ -24,20 +24,20 @@ def mock_hf_inference():
 
 
 @pytest.fixture(autouse=True)
-def mock_sentence_transformer():
-    """Autouse fixture to mock SentenceTransformer during test execution."""
-    with patch("sentence_transformers.SentenceTransformer") as mock_transformer_class:
-        mock_transformer_inst = MagicMock()
+def mock_fastembed():
+    """Autouse fixture to mock TextEmbedding during test execution."""
+    with patch("fastembed.TextEmbedding") as mock_embed_class:
+        mock_embed_inst = MagicMock()
 
-        # Mock encode to return dummy vectors of length 384
-        def mock_encode(texts, **kwargs):
+        # Mock embed to return dummy vectors of length 384
+        def mock_embed(texts, **kwargs):
             if isinstance(texts, str):
-                return np.asarray([0.05] * 384, dtype=np.float32)
-            return np.asarray([[0.05] * 384 for _ in texts], dtype=np.float32)
+                return iter([np.asarray([0.05] * 384, dtype=np.float32)])
+            return iter([np.asarray([0.05] * 384, dtype=np.float32) for _ in texts])
 
-        mock_transformer_inst.encode.side_effect = mock_encode
-        mock_transformer_class.return_value = mock_transformer_inst
-        yield mock_transformer_inst
+        mock_embed_inst.embed.side_effect = mock_embed
+        mock_embed_class.return_value = mock_embed_inst
+        yield mock_embed_inst
 
 
 def test_intent_classifier_embedding_match():

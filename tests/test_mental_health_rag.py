@@ -12,10 +12,10 @@ from src.modules.rag import MentalHealthRAG
 
 class TestMentalHealthRAG(unittest.TestCase):
     @patch("src.modules.rag.QdrantClient")
-    @patch("src.modules.rag.HuggingFaceEmbeddings")
-    @patch("src.modules.rag.CrossEncoder")
-    @patch("src.modules.rag.Groq")
-    def setUp(self, mock_groq, mock_cross, mock_hf, mock_qdrant):
+    @patch("src.modules.rag.FastEmbedEmbeddings")
+    @patch("src.modules.rag.InferenceClient")
+    @patch("src.modules.rag.dspy.LM")
+    def setUp(self, mock_dspy_lm, mock_inference_client, mock_hf, mock_qdrant):
         """Set up a fresh instance of the RAG class with mocked heavy models."""
         self.cache_path = os.path.join(
             tempfile.gettempdir(),
@@ -105,7 +105,7 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
 
         # Mock Reranker scores
-        self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
+        self.rag.rerank_documents = MagicMock(return_value=[0.99])
 
         # Mock DSPy grounded response output
         self.rag.grounded_module = MagicMock(
@@ -147,7 +147,7 @@ class TestMentalHealthRAG(unittest.TestCase):
         )
         self.rag.ensemble_retriever = MagicMock()
         self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
-        self.rag.rerank_model.predict = MagicMock(return_value=[0.99])
+        self.rag.rerank_documents = MagicMock(return_value=[0.99])
 
         # Mock DSPy module calls
         self.rag.retrieval_router = MagicMock(return_value="requires_retrieval")

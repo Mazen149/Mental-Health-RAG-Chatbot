@@ -20,12 +20,15 @@ from typing import Any, List
 
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
-from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
-from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from starlette.middleware.sessions import SessionMiddleware
 from fastapi.middleware.cors import CORSMiddleware
+import logging
+
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------
 # 1. Environment Loading & Configuration
@@ -193,13 +196,13 @@ def validate_environment() -> None:
 
             collections = [c.name for c in client.get_collections().collections]
             if config.QDRANT_COLLECTION_NAME not in collections:
-                print(
+                logger.info(
                     f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' not found. It will be created on startup."
                 )
             else:
                 count_info = client.count(collection_name=config.QDRANT_COLLECTION_NAME)
                 if count_info.count == 0:
-                    print(
+                    logger.info(
                         f"Notice: Qdrant collection '{config.QDRANT_COLLECTION_NAME}' is empty. It will be populated on startup."
                     )
             client.close()
@@ -207,14 +210,13 @@ def validate_environment() -> None:
             errors.append(f"Failed to connect to Qdrant or query collection: {e}")
 
     if errors:
-        print("\n" + "=" * 80, file=sys.stderr)
-        print(
-            "ENVIRONMENT VALIDATION FAILED on startup. Please resolve these issues:",
-            file=sys.stderr,
+        logger.error("\n" + "=" * 80)
+        logger.error(
+            "ENVIRONMENT VALIDATION FAILED on startup. Please resolve these issues:"
         )
         for err in errors:
-            print(f" - {err}", file=sys.stderr)
-        print("=" * 80 + "\n", file=sys.stderr)
+            logger.error(f" - {err}")
+        logger.error("=" * 80 + "\n")
         sys.exit(1)
 
 
@@ -237,35 +239,16 @@ app = FastAPI(
 )
 
 app.add_middleware(
-    SessionMiddleware,
-    secret_key=config.SESSION_SECRET_KEY,
-    same_site="lax",
-    https_only=False,
-)
-
-app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-)
-
-BASE_DIR = Path(__file__).resolve().parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-app.mount(
-    "/static",
-    StaticFiles(directory=str(BASE_DIR / "static")),
-    name="static",
 )
 
 # Global RAG Instance
 rag: MentalHealthRAG | None = None
 DB_PATH = Path(config.CHAT_DATABASE_PATH)
-
-
-def _is_authenticated(request: Request) -> bool:
-    return bool(request.session.get("authenticated"))
 
 
 def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
@@ -535,7 +518,9 @@ async def startup_event() -> None:
         rag = MentalHealthRAG()
         documents = await asyncio.to_thread(rag.load_and_preprocess)
         await asyncio.to_thread(rag.setup_retriever, documents)
-        print("--> [RAG Setup] Vector store and retrievers preloaded successfully.")
+        logger.info(
+            "--> [RAG Setup] Vector store and retrievers preloaded successfully."
+        )
 
     from .router import preload_models
 
@@ -554,159 +539,6 @@ async def shutdown_event() -> None:
 # ------------------------------------------------------------------------------
 # 6. HTTP Endpoints
 # ------------------------------------------------------------------------------
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request) -> HTMLResponse:
-    """Serves the main Serene AI empathetic chat window UI."""
-    if not _is_authenticated(request):
-        return RedirectResponse(url="/login", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "mode": "chat",
-            "username": request.session.get("username", "Guest"),
-        },
-    )
-
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request) -> HTMLResponse:
-    if _is_authenticated(request):
-        return RedirectResponse(url="/", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "mode": "login",
-            "error": None,
-            "success": request.query_params.get("registered") == "1",
-        },
-    )
-
-
-@app.post("/login")
-async def login(request: Request) -> HTMLResponse:
-    form = await request.form()
-    username = str(form.get("username", "")).strip()
-    password = str(form.get("password", "")).strip()
-
-    if not username or not password:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "login",
-                "error": "Please enter both a username and password.",
-                "success": False,
-            },
-            status_code=401,
-        )
-
-    user = _get_user_by_username(username)
-    if user is None:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "login",
-                "error": "No account found for that username. Please register first.",
-                "success": False,
-            },
-            status_code=401,
-        )
-    elif not _verify_password(password, user["password_salt"], user["password_hash"]):
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "login",
-                "error": "Invalid username or password.",
-                "success": False,
-            },
-            status_code=401,
-        )
-
-    request.session["authenticated"] = True
-    request.session["user_id"] = int(user["id"])
-    request.session["username"] = username
-    _update_last_login(int(user["id"]))
-    return RedirectResponse(url="/", status_code=302)
-
-
-@app.get("/register", response_class=HTMLResponse)
-async def register_page(request: Request) -> HTMLResponse:
-    if _is_authenticated(request):
-        return RedirectResponse(url="/", status_code=302)
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={
-            "mode": "register",
-            "error": None,
-        },
-    )
-
-
-@app.post("/register")
-async def register(request: Request) -> HTMLResponse:
-    form = await request.form()
-    username = str(form.get("username", "")).strip()
-    password = str(form.get("password", "")).strip()
-    confirm_password = str(form.get("confirm_password", "")).strip()
-
-    if not username or not password or not confirm_password:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "register",
-                "error": "Please fill in every field.",
-            },
-            status_code=400,
-        )
-
-    if password != confirm_password:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "register",
-                "error": "Passwords do not match. Please try again.",
-            },
-            status_code=400,
-        )
-
-    if _get_user_by_username(username) is not None:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "register",
-                "error": "That username already exists. Please choose another one or log in.",
-            },
-            status_code=400,
-        )
-
-    try:
-        _create_user(username, password)
-    except sqlite3.IntegrityError:
-        return templates.TemplateResponse(
-            request=request,
-            name="index.html",
-            context={
-                "mode": "register",
-                "error": "Could not create your account. Please try again.",
-            },
-            status_code=500,
-        )
-
-    return RedirectResponse(url="/login?registered=1", status_code=302)
-
-
-@app.post("/logout")
-async def logout(request: Request) -> RedirectResponse:
-    request.session.clear()
-    return RedirectResponse(url="/login", status_code=302)
 
 
 @app.get("/health")
@@ -717,23 +549,13 @@ async def health_check() -> dict:
 
 @app.get("/chat/history")
 async def chat_history(request: Request) -> list[dict[str, Any]]:
-    if not _is_authenticated(request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
-    user_id = request.session.get("user_id")
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
+    user_id = _get_or_create_guest_user_id()
     return _load_chat_history(int(user_id))
 
 
 @app.post("/chat/clear")
 async def clear_chat(request: Request) -> dict:
-    if not _is_authenticated(request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
-    user_id = request.session.get("user_id")
-    if user_id is None:
-        raise HTTPException(status_code=401, detail="Authentication required.")
+    user_id = _get_or_create_guest_user_id()
     with _db_connection() as conn:
         conn.execute("DELETE FROM chat_interactions WHERE user_id = ?", (int(user_id),))
         conn.commit()
@@ -743,9 +565,7 @@ async def clear_chat(request: Request) -> dict:
 @app.post("/chat", response_model=ChatResponse)
 async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
-    user_id = page_request.session.get("user_id")
-    if user_id is None:
-        user_id = _get_or_create_guest_user_id()
+    user_id = _get_or_create_guest_user_id()
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -793,9 +613,7 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
 @app.post("/chat/stream")
 async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingResponse:
     """Streams the generated answer as SSE chunks after the RAG response is ready."""
-    user_id = page_request.session.get("user_id")
-    if user_id is None:
-        user_id = _get_or_create_guest_user_id()
+    user_id = _get_or_create_guest_user_id()
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -847,9 +665,6 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
     """
     Transcribes speech input using Groq's Whisper model (whisper-large-v3).
     """
-    if not _is_authenticated(page_request):
-        raise HTTPException(status_code=401, detail="Authentication required.")
-
     if not config.GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="Groq API key is not configured.")
 
@@ -869,7 +684,7 @@ async def transcribe(page_request: Request, file: UploadFile = File(...)) -> dic
         )
         return {"text": transcription.text}
     except Exception as e:
-        print(f"--> [Speech-to-Text Error] Audio transcription failed: {e}")
+        logger.error(f"--> [Speech-to-Text Error] Audio transcription failed: {e}")
         raise HTTPException(
             status_code=500, detail=f"Failed to transcribe audio: {str(e)}"
         )
@@ -881,9 +696,7 @@ async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict
     if request.vote not in ("up", "down"):
         raise HTTPException(status_code=400, detail="Vote must be 'up' or 'down'.")
 
-    user_id = page_request.session.get("user_id")
-    if user_id is None:
-        user_id = _get_or_create_guest_user_id()
+    user_id = _get_or_create_guest_user_id()
     _save_feedback(
         user_id=int(user_id) if user_id is not None else None,
         vote=request.vote,

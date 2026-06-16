@@ -38,7 +38,9 @@ dependencies = [
     "onnxruntime>=1.26.0",
     "tokenizers>=0.22.2",
     "huggingface-hub>=1.16.1",
-    "libsql>=0.1.11",
+    "opentelemetry-api>=1.21.0",
+    "opentelemetry-sdk>=1.21.0",
+    "opentelemetry-exporter-otlp-proto-http>=1.21.0",
 ]
 
 [build-system]

@@ -22,7 +22,17 @@
 
 **Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support.
 
-The application features secure user workspaces (authentication and persistent chat histories via a remote **Turso/libSQL** database with a local SQLite database fallback), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
+## 📊 Monitoring & Metrics
+
+This project instruments the API with OpenTelemetry (OTLP -> Axiom or any OTLP endpoint) and records three metric categories:
+
+- Model/NLP: rag.retrieval.score & server.response.latency_ms — tracks retrieval quality and model/RAG latency to detect degradation or regressions.
+- Data: chat.message.length & feedback.votes — monitors input size distribution and user feedback (up/down) to catch UX problems or data drift.
+- Server: server.request.count, server.error.count, server.uptime_seconds — basic service health, load, and error-rate monitoring.
+
+Configure metrics via OTEL_EXPORTER_OTLP_METRICS_ENDPOINT or AXIOM_OTLP_METRICS_ENDPOINT and set AXIOM_API_TOKEN / AXIOM_ACCESS_TOKEN for authentication.
+
+The application features secure user workspaces (authentication and persistent chat histories via a local SQLite database), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
 
 ---
 

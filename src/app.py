@@ -35,6 +35,7 @@ logger = logging.getLogger(__name__)
 # 1. Environment Loading & Configuration
 # ------------------------------------------------------------------------------
 from .config import config
+from . import metrics
 
 # Local project imports (must load after environment resolution)
 from .modules.rag import MentalHealthRAG
@@ -641,6 +642,13 @@ def _sse_event(event: str, data: Any) -> str:
 @app.on_event("startup")
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
+    # Initialize metrics (OpenTelemetry)
+    try:
+        metrics.init_metrics()
+        print("--> [Metrics] OpenTelemetry metrics initialized.")
+    except Exception as e:
+        print(f"--> [Metrics] Failed to initialize metrics: {e}")
+
     _init_chat_db()
 
     # Download missing artifacts from Hugging Face if needed
@@ -725,11 +733,30 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
 
+    # Metrics: increment request and record message length
+    try:
+        metrics.record_request()
+        metrics.record_message_length(len(query_text))
+    except Exception:
+        pass
+
     result: dict[str, Any] | None = None
     error_response: str | None = None
     try:
+        import time
+
+        start = time.time()
         result = await route_query(query_text, rag, history=request.history)
+        elapsed_ms = (time.time() - start) * 1000.0
+        try:
+            metrics.record_response_latency(elapsed_ms)
+        except Exception:
+            pass
     except Exception:
+        try:
+            metrics.record_error()
+        except Exception:
+            pass
         error_response = "Failed to generate a response."
 
     if not result or "answer" not in result:
@@ -858,6 +885,10 @@ async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict
         user_message=request.user_message.strip(),
         bot_response=request.bot_response.strip(),
     )
+    try:
+        metrics.record_feedback_vote(request.vote)
+    except Exception:
+        pass
     return {"status": "ok", "message": "Feedback saved successfully."}
 
 

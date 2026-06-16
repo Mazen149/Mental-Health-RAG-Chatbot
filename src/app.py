@@ -831,6 +831,8 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         )
         raise HTTPException(
             status_code=500, detail=error_response or "Failed to generate a response."
+        )
+    
     _save_chat_interaction(
         user_id=int(user_id),
         query=query_text,

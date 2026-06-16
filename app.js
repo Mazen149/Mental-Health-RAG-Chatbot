@@ -10,7 +10,12 @@ const apiUrlInput = document.getElementById("api-url");
 const apiEndpointInput = document.getElementById("api-endpoint");
 
 const STORAGE_KEY = "sanad_ai_settings";
-const defaults = { apiUrl: "https://sanad-ai.myvnc.com", endpoint: "/chat" };
+const defaults = {
+  apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
+    ? "" // Relative URL for internal Docker routing
+    : "https://sanad-ai.myvnc.com",
+  endpoint: "/chat"
+};
 
 // ── CORS proxy for mixed-content (HTTPS page → HTTP API) ──
 function proxyUrl(url) {

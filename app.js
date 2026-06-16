@@ -380,7 +380,7 @@ function addBotMessage(text, userMessage, resources = []) {
           const scoreVal = typeof res.score === 'number'
             ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
             : 100;
-          return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">[${index + 1}]</span><span class="source-lbl">Clinical Context</span><span class="source-match">${scoreVal}% Match</span></button>`;
+          return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">Source ${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
         }).join("")}
       </div>
     `;
@@ -411,11 +411,21 @@ function addBotMessage(text, userMessage, resources = []) {
 
 async function sendFeedback(btn, userMessage, botResponse) {
   const wrap = btn.closest(".feedback-btns");
-  if (wrap.classList.contains("voted")) return;
-
   const vote = btn.dataset.vote;
-  wrap.classList.add("voted");
+
+  const isAlreadySelected = btn.classList.contains("selected");
+
+  if (isAlreadySelected) {
+    // Undo selection on UI
+    btn.classList.remove("selected");
+    wrap.classList.remove("voted");
+    return;
+  }
+
+  // Clear existing selections and toggle new vote
+  wrap.querySelectorAll(".fb-btn").forEach(b => b.classList.remove("selected"));
   btn.classList.add("selected");
+  wrap.classList.add("voted");
 
   try {
     await fetch(proxyUrl(settings.apiUrl + "/feedback"), {
@@ -480,7 +490,7 @@ function renderSourcesList(container, resources) {
       const scoreVal = typeof res.score === 'number'
         ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
         : 100;
-      return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">[${index + 1}]</span><span class="source-lbl">Clinical Context</span><span class="source-match">${scoreVal}% Match</span></button>`;
+      return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">Source ${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
     }).join("")}
   `;
   container.style.display = "flex";

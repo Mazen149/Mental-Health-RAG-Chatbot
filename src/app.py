@@ -831,20 +831,6 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         )
         raise HTTPException(
             status_code=500, detail=error_response or "Failed to generate a response."
-        )
-
-    # ---------------------------------------------------------
-    # HYPERDX / OPENTELEMETRY: Attach rich metadata to the trace
-    # ---------------------------------------------------------
-    from opentelemetry import trace
-    current_span = trace.get_current_span()
-    current_span.set_attribute("chat.user_query", query_text)
-    current_span.set_attribute("chat.bot_response", str(result["answer"]))
-    current_span.set_attribute("chat.language", str(result.get("language", "unknown")))
-    current_span.set_attribute("chat.emotion", str(result.get("emotion", [])))
-    current_span.set_attribute("chat.intent", str(result.get("intent", "unknown")))
-    current_span.set_attribute("chat.resources_count", len(result.get("resources", [])))
-
     _save_chat_interaction(
         user_id=int(user_id),
         query=query_text,
@@ -893,18 +879,6 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
     answer = str(result.get("answer", "")).strip() or "Failed to generate a response."
     resources = result.get("resources", [])
     
-    # ---------------------------------------------------------
-    # HYPERDX / OPENTELEMETRY: Attach rich metadata to the trace
-    # ---------------------------------------------------------
-    from opentelemetry import trace
-    current_span = trace.get_current_span()
-    current_span.set_attribute("chat.user_query", query_text)
-    current_span.set_attribute("chat.bot_response", answer)
-    current_span.set_attribute("chat.language", str(result.get("language", "unknown")))
-    current_span.set_attribute("chat.emotion", str(result.get("emotion", [])))
-    current_span.set_attribute("chat.intent", str(result.get("intent", "unknown")))
-    current_span.set_attribute("chat.resources_count", len(resources))
-
     _save_chat_interaction(
         user_id=int(user_id),
         query=query_text,

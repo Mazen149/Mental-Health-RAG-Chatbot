@@ -273,7 +273,9 @@ html, body {
 .message {
   display: flex;
   gap: 16px;
-  max-width: 75%;
+  width: 100%;
+  max-width: 820px; /* aligns perfectly with the centered input bar width */
+  margin: 0 auto;
   animation: fadeIn 0.2s ease;
 }
 
@@ -283,12 +285,19 @@ html, body {
 }
 
 .message.user {
-  align-self: flex-end;
   flex-direction: row-reverse;
 }
 
+.message.user .bubble-wrap {
+  max-width: 75%;
+}
+
 .message.bot {
-  align-self: flex-start;
+  justify-content: flex-start;
+}
+
+.message.bot .bubble-wrap {
+  width: 100%;
 }
 
 .avatar {
@@ -508,8 +517,8 @@ textarea::placeholder {
 .crisis-disclaimer {
   text-align: center;
   font-size: 0.76rem;
-  color: #e11d48; /* Crimson red */
-  opacity: 0.95;
+  color: var(--text-secondary); /* Muted neutral color instead of bright red */
+  opacity: 0.85;
   line-height: 1.4;
   display: flex;
   align-items: center;
@@ -519,6 +528,7 @@ textarea::placeholder {
 
 .crisis-icon {
   font-size: 0.85rem;
+  opacity: 0.8;
 }
 
 /* ── Error ── */

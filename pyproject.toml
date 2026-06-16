@@ -38,6 +38,7 @@ dependencies = [
     "onnxruntime>=1.26.0",
     "tokenizers>=0.22.2",
     "huggingface-hub>=1.16.1",
+    "libsql>=0.1.11",
 ]
 
 [build-system]

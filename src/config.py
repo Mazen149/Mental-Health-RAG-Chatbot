@@ -79,6 +79,8 @@ class Config:
     # ------------------------------------------------------------------------------
     SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-change-me")
     CHAT_DATABASE_PATH = ARTIFACTS_DIR / "chat_interactions.sqlite3"
+    TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
+    TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
 
 # Expose a singleton instance

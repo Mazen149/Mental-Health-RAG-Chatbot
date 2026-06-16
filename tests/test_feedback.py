@@ -19,6 +19,10 @@ class TestFeedback(unittest.TestCase):
         self.db_patcher = patch("src.app.DB_PATH", self.db_path)
         self.db_patcher.start()
 
+        # Patch config to disable Turso connection during tests
+        self.config_patcher = patch("src.app.config.TURSO_DATABASE_URL", None)
+        self.config_patcher.start()
+
         # Initialize the test DB schema
         from src.app import _init_chat_db
 
@@ -53,6 +57,7 @@ class TestFeedback(unittest.TestCase):
                 sys.modules[name]._is_authenticated = original_func
 
         self.db_patcher.stop()
+        self.config_patcher.stop()
 
         # Clean up temp database directory
         try:

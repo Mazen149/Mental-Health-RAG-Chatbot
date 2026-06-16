@@ -251,6 +251,107 @@ rag: MentalHealthRAG | None = None
 DB_PATH = Path(config.CHAT_DATABASE_PATH)
 
 
+# ------------------------------------------------------------------------------
+# LibSQL Compatibility Wrappers for Turso (matching sqlite3.Row / sqlite3 API)
+# ------------------------------------------------------------------------------
+class LibsqlRow:
+    def __init__(self, description, row_tuple):
+        self._keys = [col[0] for col in description] if description else []
+        self._values = row_tuple
+        self._dict = dict(zip(self._keys, self._values))
+
+    def keys(self) -> list[str]:
+        return self._keys
+
+    def __getitem__(self, key: str | int) -> Any:
+        if isinstance(key, int):
+            return self._values[key]
+        return self._dict[key]
+
+
+class LibsqlCursorWrapper:
+    def __init__(self, cursor):
+        self._cursor = cursor
+
+    def execute(self, *args, **kwargs):
+        self._cursor.execute(*args, **kwargs)
+        return self
+
+    def executemany(self, *args, **kwargs):
+        self._cursor.executemany(*args, **kwargs)
+        return self
+
+    def executescript(self, *args, **kwargs):
+        self._cursor.executescript(*args, **kwargs)
+        return self
+
+    @property
+    def lastrowid(self):
+        return self._cursor.lastrowid
+
+    @property
+    def description(self):
+        return self._cursor.description
+
+    def fetchone(self):
+        row = self._cursor.fetchone()
+        if row is None:
+            return None
+        return LibsqlRow(self._cursor.description, row)
+
+    def fetchall(self):
+        rows = self._cursor.fetchall()
+        desc = self._cursor.description
+        return [LibsqlRow(desc, r) for r in rows]
+
+    def fetchmany(self, size=None):
+        if size is None:
+            rows = self._cursor.fetchmany()
+        else:
+            rows = self._cursor.fetchmany(size)
+        desc = self._cursor.description
+        return [LibsqlRow(desc, r) for r in rows]
+
+    def close(self):
+        self._cursor.close()
+
+    def __iter__(self):
+        desc = self._cursor.description
+        for r in self._cursor:
+            yield LibsqlRow(desc, r)
+
+
+class LibsqlConnectionWrapper:
+    def __init__(self, connection):
+        self._conn = connection
+
+    def cursor(self):
+        return LibsqlCursorWrapper(self._conn.cursor())
+
+    def execute(self, *args, **kwargs):
+        cur = self.cursor()
+        cur.execute(*args, **kwargs)
+        return cur
+
+    def commit(self):
+        self._conn.commit()
+
+    def rollback(self):
+        self._conn.rollback()
+
+    def close(self):
+        self._conn.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self.rollback()
+        else:
+            self.commit()
+
+
 def _hash_password(password: str, salt: bytes | None = None) -> tuple[str, str]:
     salt = salt or os.urandom(16)
     password_hash = hashlib.pbkdf2_hmac(
@@ -265,9 +366,24 @@ def _verify_password(password: str, salt_hex: str, expected_hash_hex: str) -> bo
     return hmac.compare_digest(computed_hash_hex, expected_hash_hex)
 
 
+def _db_connection() -> Any:
+    if config.TURSO_DATABASE_URL:
+        import libsql
+        conn = libsql.connect(
+            database=config.TURSO_DATABASE_URL,
+            auth_token=config.TURSO_AUTH_TOKEN or "",
+        )
+        return LibsqlConnectionWrapper(conn)
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        return conn
+
+
 def _init_chat_db() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(DB_PATH) as conn:
+    if not config.TURSO_DATABASE_URL:
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with _db_connection() as conn:
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS users (
@@ -316,7 +432,7 @@ def _init_chat_db() -> None:
 def _save_feedback(
     user_id: int | None, vote: str, user_message: str, bot_response: str
 ) -> None:
-    with sqlite3.connect(DB_PATH) as conn:
+    with _db_connection() as conn:
         conn.execute(
             """
             INSERT INTO feedback (user_id, vote, user_message, bot_response)
@@ -328,8 +444,7 @@ def _save_feedback(
 
 
 def _get_or_create_guest_user_id() -> int:
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.row_factory = sqlite3.Row
+    with _db_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM users WHERE username = ?", ("guest",))
         row = cursor.fetchone()
@@ -346,12 +461,6 @@ def _get_or_create_guest_user_id() -> int:
         )
         conn.commit()
         return cursor.lastrowid
-
-
-def _db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 
 def _get_user_by_username(username: str) -> dict[str, Any] | None:

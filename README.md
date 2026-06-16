@@ -22,13 +22,13 @@
 
 **Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support.
 
-The application features secure user workspaces (authentication and persistent chat histories via a local SQLite database), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
+The application features secure user workspaces (authentication and persistent chat histories via a remote **Turso/libSQL** database with a local SQLite database fallback), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
 
 ---
 
 ## 🏗️ Architecture & Pipeline Flow
 
-The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy, as implemented in [router.py](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/New%20folder%20%283%29/src/router.py):
+The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy, as implemented in [router.py](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/src/router.py):
 
 ```mermaid
 graph TD
@@ -77,7 +77,8 @@ graph TD
 
 *   **🔐 Secure User Authentication & Chat History Workspace**:
     *   Integrates registration (`/register`) and login (`/login`) views, backed by a FastAPI `SessionMiddleware` session layer and secure PBKDF2 (SHA-256) password hashing.
-    *   Manages user-specific conversations in a local SQLite database (`chat_interactions.sqlite3`), permitting users to load (`/chat/history`), persist, or clear (`/chat/clear`) their chat history.
+    *   Manages user-specific conversations in a remote **Turso (libSQL)** cloud database, permitting users to load (`/chat/history`), persist, or clear (`/chat/clear`) their chat history.
+    *   Supports dynamic fallback to a local SQLite database (`chat_interactions.sqlite3`) if no Turso URL is configured.
 *   **🎙️ Whisper Speech Input & Client-Side Silence Detection**:
     *   Supports hands-free speech input utilizing the browser's native `MediaRecorder` API.
     *   Leverages real-time client-side voice activity and silence analysis to automatically stop recording and upload the voice sample.
@@ -239,6 +240,10 @@ QDRANT_URL=
 QDRANT_API_KEY=
 QDRANT_COLLECTION_NAME=mental_health
 
+# Remote Turso (libSQL) Database Settings (Falls back to local SQLite if empty)
+TURSO_DATABASE_URL=libsql://sanadchatinteractiondb-mazen248.aws-eu-west-1.turso.io
+TURSO_AUTH_TOKEN=your_turso_auth_token_here
+
 # Model & Translation Settings
 ENABLE_TRANSLATION=False
 GROQ_GENERATION_MODEL=openai/gpt-oss-20b
@@ -391,7 +396,7 @@ We compared our baseline RAG pipelines (Approach 1 & Approach 2) against the fin
 - **Context Recall**: Verifies that the retriever fetches all necessary clinical advice needed to form an answer. Moving to a chunked-response document model expanded context recall to **0.89+**.
 - **Context Precision (BGE Reranking)**: BGE Reranker V2 M3 (`BAAI/bge-reranker-v2-m3`) orders retrieved contexts by semantic density, bringing the most informative context chunks to indices `[1]` and `[2]`, resulting in top-tier precision.
 
-You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/New%20folder%20%283%29/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/New%20folder%20%283%29/notebooks/RAG_part2.ipynb) files.
+You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part2.ipynb) files.
 
 ---
 

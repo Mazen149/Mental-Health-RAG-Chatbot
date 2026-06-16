@@ -1,6 +1,6 @@
 """
 ================================================================================
-SERENE AI — CONVERSATIONAL ROUTING ENGINE
+SANAD AI — CONVERSATIONAL ROUTING ENGINE
 ================================================================================
 Routes queries dynamically using conversational fast-paths (regex checking),
 crisis safety bypass triggers, and fallbacks to full semantic RAG logic.
@@ -161,7 +161,26 @@ async def route_query(query: str, rag_instance, history: list = None) -> dict:
 
     if detect_prompt_injection(query):
         safe_print(
-            "--> [Router Guardrail] Matched prompt injection indicator. Declining query."
+            "---> [Router Guardrail] Matched prompt injection indicator. Declining query."
+        )
+        return {
+            "answer": OUT_OF_SCOPE_RESPONSES.get(
+                language, OUT_OF_SCOPE_RESPONSES["English"]
+            ),
+            "resources": [],
+            "language": language,
+            "emotion": None,
+            "intent": "out_of_scope",
+        }
+
+    # =============================================
+    # 0.7. FIGURATIVE / IDIOMATIC EXPRESSION GUARDRAIL (takes < 1ms)
+    # =============================================
+    from .modules.intent_classifier import is_figurative_expression
+
+    if is_figurative_expression(query):
+        safe_print(
+            "---> [Router Guardrail] Matched figurative/idiomatic expression. Declining query as out_of_scope."
         )
         return {
             "answer": OUT_OF_SCOPE_RESPONSES.get(

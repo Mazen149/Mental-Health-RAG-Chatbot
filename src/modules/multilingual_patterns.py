@@ -1,6 +1,6 @@
 """
 ================================================================================
-SERENE AI — MULTILINGUAL PATTERNS & RESPONSE TEMPLATES
+SANAD AI — MULTILINGUAL PATTERNS & RESPONSE TEMPLATES
 ================================================================================
 Contains localized regex patterns, conversational templates, crisis hotline
 responses, and polite out-of-scope redirection text for all 20 languages.

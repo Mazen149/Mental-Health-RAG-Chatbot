@@ -87,6 +87,7 @@ graph TD
     *   Integrates registration (`/register`) and login (`/login`) views, backed by a FastAPI `SessionMiddleware` session layer and secure PBKDF2 (SHA-256) password hashing.
     *   Manages user-specific conversations in a remote **Turso (libSQL)** cloud database, permitting users to load (`/chat/history`), persist, or clear (`/chat/clear`) their chat history.
     *   Supports dynamic fallback to a local SQLite database (`chat_interactions.sqlite3`) if no Turso URL is configured.
+    *   Stores historical chat interactions and user thumbs up/down feedback on responses, building a rich dataset that can be utilized in the future for **RLHF (Reinforcement Learning from Human Feedback)** fine-tuning.
 *   **🎙️ Whisper Speech Input & Client-Side Silence Detection**:
     *   Supports hands-free speech input utilizing the browser's native `MediaRecorder` API.
     *   Leverages real-time client-side voice activity and silence analysis to automatically stop recording and upload the voice sample.
@@ -266,7 +267,7 @@ EMOTION_BASE_MODEL=xlm-roberta-base
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
 LANGCHAIN_API_KEY="your_langsmith_api_key_here"
-LANGCHAIN_PROJECT="serene_ai"
+LANGCHAIN_PROJECT="sanad_ai"
 ```
 
 ---

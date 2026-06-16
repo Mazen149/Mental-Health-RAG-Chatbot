@@ -1,6 +1,6 @@
 """
 ================================================================================
-SERENE AI — FASTAPI APPLICATION SERVER
+SANAD AI — FASTAPI APPLICATION SERVER
 ================================================================================
 Empathetic, multi-layered mental health support backend leveraging
 asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
@@ -230,9 +230,9 @@ def validate_environment() -> None:
 # 4. FastAPI Application Setup
 # ------------------------------------------------------------------------------
 app = FastAPI(
-    title="Serene AI - Empowering Mental Health Support API",
+    title="Sanad AI - Empowering Mental Health Support API",
     description=(
-        "🌿 **Serene AI API Engine**\n\n"
+        "🌿 **Sanad AI API Engine**\n\n"
         "An advanced, multi-layered mental health support backend leveraging:\n"
         "- **BGE Reranker V2 M3** & BM25 Hybrid Retrieval\n"
         "- **XLM-RoBERTa** & custom local models for multilingual emotion/intent classification\n"

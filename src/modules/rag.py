@@ -1,6 +1,6 @@
 """
 ================================================================================
-SERENE AI — RAG PIPELINE ENGINE
+SANAD AI — RAG PIPELINE ENGINE
 ================================================================================
 Implements hybrid document retrieval (BM25 + Qdrant), batch cross-encoder
 reranking via Hugging Face inference API, and LLM empathetic grounding.
@@ -187,6 +187,12 @@ def normalize_text(text: str) -> str:
 
 
 def detect_crisis(query: str) -> bool:
+    # GUARDRAIL: Figurative expression pre-check
+    # before any keyword matching can produce a false positive.
+    from .intent_classifier import is_figurative_expression
+    if is_figurative_expression(query):
+        return False
+
     q_lower = query.lower()
     
     # 1. Identify matched keywords

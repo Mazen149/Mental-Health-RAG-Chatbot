@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 
 
 class Config:
-    """Centralized configuration and path management for Serene AI."""
+    """Centralized configuration and path management for Sanad AI."""
 
     # ------------------------------------------------------------------------------
     # 1. Project Root & Environment Loading

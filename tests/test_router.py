@@ -133,6 +133,17 @@ class TestRouter(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(detect_crisis("أريد الانتحار"))
         self.assertTrue(detect_crisis("I want to end my life"))
         self.assertFalse(detect_crisis("I am feeling a bit stressed from work"))
+        
+        # Test negations/preventative queries
+        self.assertFalse(detect_crisis("I don't want to suicide"))
+        self.assertFalse(detect_crisis("I do not want to end my life"))
+        self.assertFalse(detect_crisis("لا أريد الانتحار"))
+        self.assertFalse(detect_crisis("How can we prevent suicide?"))
+        
+        # Test figurative/idiomatic expressions
+        self.assertFalse(detect_crisis("أنا بمووت في مازن"))
+        self.assertFalse(detect_crisis("I am dying of laughter"))
+        self.assertFalse(detect_crisis("this homework is killing me"))
 
     @patch("src.router.detect_language")
     @patch("src.router.classify_emotion")

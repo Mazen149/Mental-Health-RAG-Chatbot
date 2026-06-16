@@ -16,7 +16,7 @@ class IntentClassifierSignature(dspy.Signature):
     - gratitude: for expressions of thanks or appreciation.
     - out_of_scope: for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).
     - asking_mental_health_question: for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.
-    - crisis: for any query indicating suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.
+    - crisis: for any query indicating active suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself. Do NOT classify figurative speech, hyperbole, or common idioms (e.g., "dying to see you", "killing me", "بموت فيك", "بموت من الضحك", "بمووت في مازن") as crisis.
     """
 
     text = dspy.InputField(desc="The user message to classify")

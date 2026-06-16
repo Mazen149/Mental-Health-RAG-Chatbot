@@ -248,21 +248,37 @@ class IntentClassifier:
     def classify(self, text: str, language: str = "English") -> Intent:
         # Run embedding classifier for all languages since we now use a multilingual embedding model
         embedding_intent = self._embedding_classifier(text)
+        
+        resolved_intent = None
         if embedding_intent is not None:
             # If the predicted intent is crisis but confidence is below 85%, route to LLM fallback
             if embedding_intent.type == "crisis" and embedding_intent.confidence < 0.85:
                 print(
                     f"--> [Intent Classifier] Embedding classified as crisis but confidence {embedding_intent.confidence:.5f} is below 85%. Routing to LLM fallback."
                 )
-                return self.llm_fallback(text)
+                resolved_intent = self.llm_fallback(text)
+            else:
+                print(
+                    f"--> [Intent Classifier] Classified intent as '{embedding_intent.type}' with confidence {embedding_intent.confidence:.5f} using embedding classifier."
+                )
+                resolved_intent = embedding_intent
+        else:
+            # LLM fallback
+            resolved_intent = self.llm_fallback(text)
 
-            print(
-                f"--> [Intent Classifier] Classified intent as '{embedding_intent.type}' with confidence {embedding_intent.confidence:.5f} using embedding classifier."
-            )
-            return embedding_intent
-
-        # LLM fallback
-        return self.llm_fallback(text)
+        # Post-classification safety override:
+        # If the resolved intent is "crisis", but detect_crisis(text) is False,
+        # override it to "asking_mental_health_question".
+        if resolved_intent.type == "crisis":
+            from .rag import detect_crisis
+            if not detect_crisis(text):
+                print(
+                    f"--> [Intent Classifier] Overriding intent 'crisis' to 'asking_mental_health_question' because detect_crisis returned False."
+                )
+                resolved_intent.type = "asking_mental_health_question"
+                resolved_intent.confidence = 0.90
+                
+        return resolved_intent
 
     def _embedding_classifier(self, text: str) -> Intent | None:
         text_embedding = self._get_embedding(text)

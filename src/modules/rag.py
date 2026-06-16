@@ -188,7 +188,92 @@ def normalize_text(text: str) -> str:
 
 def detect_crisis(query: str) -> bool:
     q_lower = query.lower()
-    return any(kw in q_lower for kw in CRISIS_KEYWORDS)
+    
+    # 1. Identify matched keywords
+    matched_kws = [kw for kw in CRISIS_KEYWORDS if kw in q_lower]
+    if not matched_kws:
+        return False
+        
+    # Negation or prevention words/phrases to check in the preceding context of the keyword
+    negation_signals = [
+        # English
+        "not", "don't", "dont", "never", "no", "won't", "wont", "without", "prevent", "stop", "against", "wouldn't", "shouldn't", "cannot", "cant", "can't", "neither", "nor", "avoid", "deny", "refuse", "free from", "no intention", "not thinking",
+        # Arabic
+        "لا", "لن", "لم", "ليس", "ليست", "لست", "ما", "غير", "دون", "بدون", "منع", "تجنب", "عدم", "بلا", "حماية", "وقاية", "لا أريد", "لا اريد", "لا أفكر", "لا افكر", "لست منتحرا", "لست منتحراً",
+        # French
+        "ne", "pas", "non", "sans", "jamais", "rien", "plus", "éviter", "prévenir",
+        # Spanish
+        "no", "nunca", "jamas", "jamás", "tampoco", "nada", "sin", "evitar", "prevenir",
+        # German
+        "nicht", "nie", "nein", "kein", "keine", "ohne", "verhindern", "vermeiden",
+        # Italian
+        "non", "mai", "nessuno", "senza", "evitare", "prevenire",
+        # Portuguese
+        "não", "nunca", "jamais", "sem", "evitar", "prevenir",
+        # Russian
+        "не", "нет", "никогда", "без", "избежать", "предотвратить",
+        # Turkish
+        "değil", "degil", "asla", "hiç", "hic", "yok", "önlemek", "kaçınmak",
+        # Japanese
+        "ない", "ず", "なし", "防ぐ", "避ける",
+        # Chinese
+        "不", "没", "没有", "无", "避免", "预防", "防止",
+        # Vietnamese
+        "không", "chưa", "đừng", "tránh", "ngăn",
+        # Polish
+        "nie", "nigdy", "bez", "unikać", "zapobiegać",
+        # Dutch
+        "niet", "nooit", "geen", "zonder", "voorkomen", "vermijden",
+    ]
+
+    # Figurative or idiomatic words/phrases to filter out false alarms (e.g. "dying of laughter", "بموت في")
+    figurative_signals = [
+        # English context words
+        "laughter", "laughing", "embarrassment", "embarrassed", "joke", "metaphor", "figure of speech",
+        # Arabic context words/phrases
+        "ضحك", "الضحك", "حب", "أحب", "احب", "عشق", "بعشق", "بموت في", "بمووت في", "بموت من", "بمووت من", "موت من", "بموت عليك", "بموت عليكي", "بموت فيك", "بموت فيكي"
+    ]
+
+    # For each matched keyword, check if it is negated or figurative
+    for kw in matched_kws:
+        start_idx = 0
+        while True:
+            idx = q_lower.find(kw, start_idx)
+            if idx == -1:
+                break
+            
+            # Extract preceding context within the last clause
+            context_start = max(0, idx - 45)
+            context_before = q_lower[context_start:idx]
+            
+            # Split context_before by sentence/clause boundaries and conjunctions to limit negation/figurative scope
+            clauses = re.split(r'[,.;!?\n]|\b(?:but|however|although|and|or)\b', context_before)
+            last_clause = clauses[-1] if clauses else ""
+            
+            # Check for negation in the last clause
+            is_negated = False
+            for signal in negation_signals:
+                pattern = r'(?:^|\s|[.,!?;:])' + re.escape(signal) + r'(?:$|\s|[.,!?;:])'
+                if re.search(pattern, last_clause) or (signal in ["لا", "لن", "لم", "غير", "دون", "بدون"] and signal in last_clause):
+                    is_negated = True
+                    break
+            
+            # Check for figurative/idiomatic indicators in a short window around the keyword
+            is_figurative = False
+            for signal in figurative_signals:
+                window_start = max(0, idx - 35)
+                window_end = min(len(q_lower), idx + len(kw) + 35)
+                window = q_lower[window_start:window_end]
+                if signal in window:
+                    is_figurative = True
+                    break
+
+            if not is_negated and not is_figurative:
+                return True
+            
+            start_idx = idx + len(kw)
+            
+    return False
 
 
 def detect_prompt_injection(query: str) -> bool:

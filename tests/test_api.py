@@ -1,9 +1,38 @@
+import pytest
+import tempfile
+import shutil
+from pathlib import Path
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 
 from src.app import app
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def setup_auth(monkeypatch):
+    temp_dir = tempfile.mkdtemp()
+    db_path = Path(temp_dir) / "test_api.sqlite3"
+
+    monkeypatch.setattr("src.app.config.TURSO_DATABASE_URL", None)
+    monkeypatch.setattr("src.app.DB_PATH", db_path)
+
+    from src.app import _init_chat_db
+    _init_chat_db()
+
+    # Authenticate the client
+    client.post(
+        "/register",
+        json={"username": "api_test_user", "password": "password123"},
+    )
+
+    yield
+
+    try:
+        shutil.rmtree(temp_dir)
+    except PermissionError:
+        pass
 
 
 def test_health_check():

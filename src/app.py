@@ -23,6 +23,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 import logging
 
 logging.basicConfig(
@@ -116,6 +117,11 @@ class FeedbackRequest(BaseModel):
     bot_response: str = Field(
         ..., description="The bot response associated with this feedback."
     )
+
+
+class UserAuthRequest(BaseModel):
+    username: str = Field(..., description="The user's username.")
+    password: str = Field(..., description="The user's password.")
 
 
 # ------------------------------------------------------------------------------
@@ -246,6 +252,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET_KEY)
+
 # Global RAG Instance
 rag: MentalHealthRAG | None = None
 DB_PATH = Path(config.CHAT_DATABASE_PATH)
@@ -364,6 +372,20 @@ def _verify_password(password: str, salt_hex: str, expected_hash_hex: str) -> bo
     salt = bytes.fromhex(salt_hex)
     _, computed_hash_hex = _hash_password(password, salt)
     return hmac.compare_digest(computed_hash_hex, expected_hash_hex)
+
+
+def _is_authenticated(request: Request) -> bool:
+    """Checks if the user is authenticated in the current session."""
+    return request.session.get("authenticated", False)
+
+
+def _get_active_user_id(request: Request) -> int:
+    """Fetches the user_id from the session if authenticated; otherwise falls back to guest user_id."""
+    if _is_authenticated(request):
+        user_id = request.session.get("user_id")
+        if user_id is not None:
+            return int(user_id)
+    return _get_or_create_guest_user_id()
 
 
 def _db_connection() -> Any:
@@ -659,13 +681,21 @@ async def health_check() -> dict:
 
 @app.get("/chat/history")
 async def chat_history(request: Request) -> list[dict[str, Any]]:
-    user_id = _get_or_create_guest_user_id()
+    if not _is_authenticated(request):
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please login first."
+        )
+    user_id = request.session.get("user_id")
     return _load_chat_history(int(user_id))
 
 
 @app.post("/chat/clear")
 async def clear_chat(request: Request) -> dict:
-    user_id = _get_or_create_guest_user_id()
+    if not _is_authenticated(request):
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please login first."
+        )
+    user_id = request.session.get("user_id")
     with _db_connection() as conn:
         conn.execute("DELETE FROM chat_interactions WHERE user_id = ?", (int(user_id),))
         conn.commit()
@@ -675,7 +705,11 @@ async def clear_chat(request: Request) -> dict:
 @app.post("/chat", response_model=ChatResponse)
 async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
     """Processes queries through the routing and grounding RAG pipeline."""
-    user_id = _get_or_create_guest_user_id()
+    if not _is_authenticated(page_request):
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please login first."
+        )
+    user_id = page_request.session.get("user_id")
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -723,7 +757,11 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
 @app.post("/chat/stream")
 async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingResponse:
     """Streams the generated answer as SSE chunks after the RAG response is ready."""
-    user_id = _get_or_create_guest_user_id()
+    if not _is_authenticated(page_request):
+        raise HTTPException(
+            status_code=401, detail="Authentication required. Please login first."
+        )
+    user_id = page_request.session.get("user_id")
 
     query_text = (request.query or request.message or "").strip()
     if not query_text:
@@ -806,7 +844,7 @@ async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict
     if request.vote not in ("up", "down"):
         raise HTTPException(status_code=400, detail="Vote must be 'up' or 'down'.")
 
-    user_id = _get_or_create_guest_user_id()
+    user_id = _get_active_user_id(page_request)
     _save_feedback(
         user_id=int(user_id) if user_id is not None else None,
         vote=request.vote,
@@ -814,3 +852,68 @@ async def save_feedback(page_request: Request, request: FeedbackRequest) -> dict
         bot_response=request.bot_response.strip(),
     )
     return {"status": "ok", "message": "Feedback saved successfully."}
+
+
+@app.post("/register")
+async def register(request: Request, auth_payload: UserAuthRequest) -> dict:
+    username = auth_payload.username.strip()
+    password = auth_payload.password.strip()
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=400, detail="Username and password cannot be empty."
+        )
+
+    # Check if user already exists
+    existing_user = _get_user_by_username(username)
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username already registered.")
+
+    # Create new user
+    user = _create_user(username, password)
+
+    # Save to session
+    request.session["authenticated"] = True
+    request.session["user_id"] = user["id"]
+
+    return {
+        "status": "ok",
+        "message": "User registered successfully.",
+        "username": username,
+    }
+
+
+@app.post("/login")
+async def login(request: Request, auth_payload: UserAuthRequest) -> dict:
+    username = auth_payload.username.strip()
+    password = auth_payload.password.strip()
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=400, detail="Username and password cannot be empty."
+        )
+
+    user = _get_user_by_username(username)
+    if not user or not _verify_password(
+        password, user["password_salt"], user["password_hash"]
+    ):
+        raise HTTPException(
+            status_code=401, detail="Incorrect username or password."
+        )
+
+    # Save to session
+    request.session["authenticated"] = True
+    request.session["user_id"] = user["id"]
+    _update_last_login(user["id"])
+
+    return {
+        "status": "ok",
+        "message": "Logged in successfully.",
+        "username": username,
+    }
+
+
+@app.post("/logout")
+async def logout(request: Request) -> dict:
+    request.session.clear()
+    return {"status": "ok", "message": "Logged out successfully."}

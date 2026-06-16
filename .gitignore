@@ -3,7 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 data/
-
+axiom_test.py
+otel-collector-config.yaml
 # C extensions
 *.so
 

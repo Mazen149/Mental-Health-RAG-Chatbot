@@ -1,11 +1,14 @@
 import time
 import os
 from typing import Optional
+from urllib.parse import urlparse, urlunparse
 
 from opentelemetry import metrics
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from dotenv import load_dotenv
+load_dotenv()
 
 from .config import config
 
@@ -34,6 +37,16 @@ def init_metrics() -> None:
     token = os.getenv("AXIOM_API_TOKEN") or os.getenv("AXIOM_ACCESS_TOKEN")
     if token:
         headers["Authorization"] = f"Bearer {token}"
+
+    # Normalize common OTLP endpoints to ensure the metrics collector path is
+    # included. This prevents 404 errors from users passing base OTLP host URLs.
+    parsed = urlparse(endpoint)
+    path = parsed.path or ""
+    if path.rstrip("/") not in ("/v1/metrics", "/otlp/v1/metrics"):
+        normalized_path = path.rstrip("/") + "/v1/metrics"
+        endpoint = urlunparse(
+            parsed._replace(path=normalized_path)
+        )
 
     exporter = OTLPMetricExporter(endpoint=endpoint, headers=headers)
     reader = PeriodicExportingMetricReader(exporter, export_interval_millis=5000)
@@ -66,11 +79,36 @@ def init_metrics() -> None:
     )
 
     # Uptime observable gauge
-    def _uptime_cb(observer):
+    def _uptime_cb(callback_arg):
+        """Compatibility shim for OpenTelemetry observable callbacks.
+
+        Older SDKs pass an observer object with an `observe(value, attributes)`
+        method. Newer SDKs expect the callback to return an iterable of objects
+        with a `.value` attribute. This function handles both cases.
+        """
         try:
-            observer.observe(time.time() - _start_time, {})
+            value = time.time() - _start_time
+
+            # Old-style observer API: object with `observe` method
+            observe = getattr(callback_arg, "observe", None)
+            if callable(observe):
+                try:
+                    callback_arg.observe(value, {})
+                except Exception:
+                    # Swallow to avoid breaking app startup
+                    pass
+                # Old API does not expect a return value
+                return
+
+            # New-style API: return an iterable of lightweight objects
+            from types import SimpleNamespace
+
+            # Provide `attributes` and `context` for compatibility with
+            # OpenTelemetry SDK expectations (api_measurement.attributes)
+            return (SimpleNamespace(value=value, attributes={}, context=None),)
         except Exception:
-            pass
+            # Ensure callback never raises; return empty iterable as fallback
+            return ()
 
     try:
         _meter.create_observable_gauge(

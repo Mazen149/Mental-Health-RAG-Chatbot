@@ -280,7 +280,14 @@ logoutBtn.addEventListener("click", async () => {
 input.addEventListener("input", () => {
   sendBtn.disabled = !input.value.trim();
   input.style.height = "auto";
-  input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  const newHeight = input.scrollHeight;
+  if (newHeight >= 120) {
+    input.style.height = "120px";
+    input.style.overflowY = "auto";
+  } else {
+    input.style.height = newHeight + "px";
+    input.style.overflowY = "hidden";
+  }
 });
 
 input.addEventListener("keydown", (e) => {
@@ -529,6 +536,7 @@ async function send() {
 
   input.value = "";
   input.style.height = "auto";
+  input.style.overflowY = "hidden";
   sendBtn.disabled = true;
   input.focus();
 
@@ -839,7 +847,7 @@ async function transcribeAudio(audioBlob) {
     
     const data = await res.json();
     if (data && data.text) {
-      input.value = data.text;
+      input.value = data.text.trim();
       input.dispatchEvent(new Event("input"));
       input.focus();
     }

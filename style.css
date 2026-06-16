@@ -488,6 +488,7 @@ textarea {
   line-height: 1.5;
   max-height: 120px;
   padding: 10px 0;
+  overflow: hidden; /* Hide scrollbars dynamically handled in JS */
 }
 
 textarea::placeholder {

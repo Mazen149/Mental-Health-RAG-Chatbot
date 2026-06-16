@@ -387,7 +387,7 @@ function addBotMessage(text, userMessage, resources = []) {
   }
 
   div.innerHTML = `
-    <div class="avatar bot-avatar">🌿</div>
+    <div class="avatar bot-avatar">🤖</div>
     <div class="bubble-wrap">
       <div class="bubble markdown">${htmlContent}</div>
       ${sourcesHtml}
@@ -447,7 +447,7 @@ function showTyping(message = "") {
   div.className = "message bot";
   div.id = "typing";
   div.innerHTML = `
-    <div class="avatar bot-avatar">🌿</div>
+    <div class="avatar bot-avatar">🤖</div>
     <div class="bubble-wrap">
       <div class="bubble">
         ${message ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">${escapeHtml(message)}</div>` : ""}
@@ -530,7 +530,7 @@ async function send() {
       botDiv.dataset.id = botMsgId;
 
       botDiv.innerHTML = `
-        <div class="avatar bot-avatar">🌿</div>
+        <div class="avatar bot-avatar">🤖</div>
         <div class="bubble-wrap">
           <div class="bubble markdown"></div>
           <div class="sources-list" style="display: none;"></div>

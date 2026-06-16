@@ -14,9 +14,24 @@ class IntentClassifierSignature(dspy.Signature):
     - greeting: for greeting, introduction, small talk (e.g. sharing or asking about names, how are you).
     - goodbye: for farewell and parting words.
     - gratitude: for expressions of thanks or appreciation.
-    - out_of_scope: for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math).
+    - out_of_scope: for queries completely unrelated to the assistant, user identity, or mental health (e.g. weather, sports, cooking, news, general facts, coding, math). ALSO classify figurative/idiomatic/slang expressions as out_of_scope even if they contain words like "death", "kill", "die", "dying", "موت", "بموت", "قتل", "mourir", "muero", "sterben", "morire", etc.
     - asking_mental_health_question: for any other mental-health-related question, emotional distress, therapy, anxiety, depression, panic, stress, or loneliness.
-    - crisis: for any query indicating active suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself. Do NOT classify figurative speech, hyperbole, or common idioms (e.g., "dying to see you", "killing me", "بموت فيك", "بموت من الضحك", "بمووت في مازن") as crisis.
+    - crisis: for any query indicating active suicidal thoughts, self-harm, cutting, ending one's life, or intent to inflict harm on oneself.
+
+    CRITICAL — FIGURATIVE EXPRESSIONS ARE **NOT** CRISIS AND **NOT** MENTAL HEALTH:
+    The following are ALL out_of_scope (figurative/idiomatic/slang):
+    - Arabic: "بموت فيك" (crazy about you), "بموت في مازن" (crazy about Mazen), "بموت من الضحك" (dying of laughter), "هموت من الجوع" (dying of hunger), "بحبك موت" (love you to death), "الأغنية دي بتقتلني" (this song kills me), "مجنون فيها" (crazy about her), "بموت على الشوكولاتة" (crazy about chocolate), "ميتة من الخجل" (dying of embarrassment), "الشوق قاتلني" (longing is killing me), ANY form of "بموت في/من/على + [something non-self-harm]"
+    - English: "dying to see you", "killing me", "I'm dead 💀", "dying of laughter", "I would kill for coffee", "bored to death", "scared to death", "drop dead gorgeous", "killing it", "love you to death", "starving to death", "freezing to death", "head over heels", "crazy about"
+    - French: "je meurs de rire" (dying of laughter), "mourir de faim" (dying of hunger), "tu me tues" (you kill me), "je t'aime à mourir" (love you to death), "fou de toi" (crazy about you)
+    - Spanish: "me muero de risa" (dying of laughter), "me muero de hambre" (dying of hunger), "me muero por ti" (dying for you), "me mata tu sonrisa" (your smile kills me), "loca por él" (crazy about him)
+    - German: "ich sterbe vor lachen" (dying of laughter), "totlachen" (to die laughing), "verrückt nach dir" (crazy about you)
+    - Italian: "muoio dal ridere" (dying of laughter), "sto morendo di fame" (dying of hunger), "pazza di te" (crazy about you)
+    - Portuguese: "tô morrendo de rir" (dying of laughter), "morrendo de fome" (dying of hunger), "louca por você" (crazy about you)
+    - Turkish: "gülmekten öldüm" (died laughing), "açlıktan ölüyorum" (dying of hunger), "deli gibi seviyorum" (loving like crazy)
+    - Russian: "умираю со смеху" (dying of laughter), "без ума от тебя" (crazy about you)
+    - Chinese: "笑死我了" (laughed to death), "饿死了" (starving to death), "好看死了" (gorgeous to death)
+    - Japanese: "笑いすぎて死にそう" (dying of laughter), "お腹すいて死にそう" (dying of hunger), "可愛すぎて死ぬ" (so cute I could die)
+    - ANY language: if the word for "death/dying/kill" is followed by a non-self-harm context (laughter, food, love, cold, heat, embarrassment, a person's name as object of affection, etc.) → it is out_of_scope, NOT crisis.
     """
 
     text = dspy.InputField(desc="The user message to classify")
@@ -210,7 +225,7 @@ class GroundedResponseModule(dspy.Module):
 
 
 class GeneralConversationSignature(dspy.Signature):
-    """You are Serene AI, a compassionate, friendly, and professional mental health support assistant.
+    """You are Sanad AI, a compassionate, friendly, and professional mental health support assistant.
     The user is engaging in greeting, goodbye, gratitude, or basic small talk/introductions.
     Respond warmly, naturally, and in a friendly conversational manner in the user's language.
     If the user has introduced themselves or mentioned their name in the history or query, acknowledge and remember it.

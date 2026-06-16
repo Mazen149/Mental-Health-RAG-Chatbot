@@ -1,6 +1,6 @@
 """
 ================================================================================
-SERENE AI — FASTAPI APPLICATION SERVER
+SANAD AI — FASTAPI APPLICATION SERVER
 ================================================================================
 Empathetic, multi-layered mental health support backend leveraging
 asynchronous model loading, hybrid retrieval (BM25 + Qdrant), and LLM grounding.
@@ -30,6 +30,85 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------------------
+# OpenTelemetry & HyperDX Configuration
+# ------------------------------------------------------------------------------
+from opentelemetry import metrics
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+
+hyperdx_api_key = os.getenv("HYPERDX_API_KEY", "")
+
+_resource = Resource.create({
+    "service.name": "serenity-api",
+    "service.version": "1.0.0",
+})
+
+if hyperdx_api_key:
+    # Use HyperDX OTLP endpoint
+    _metric_exporter = OTLPMetricExporter(
+        endpoint="https://in.hyperdx.io/v1/metrics",
+        headers={"Authorization": hyperdx_api_key}
+    )
+    _span_exporter = OTLPSpanExporter(
+        endpoint="https://in.hyperdx.io/v1/traces",
+        headers={"Authorization": hyperdx_api_key}
+    )
+else:
+    # Fallback to local collector
+    _otel_endpoint_metrics = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/metrics")
+    _otel_endpoint_traces = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
+    _metric_exporter = OTLPMetricExporter(endpoint=_otel_endpoint_metrics)
+    _span_exporter = OTLPSpanExporter(endpoint=_otel_endpoint_traces)
+
+# Set up Metrics
+_metric_reader = PeriodicExportingMetricReader(_metric_exporter, export_interval_millis=15000)
+_meter_provider = MeterProvider(resource=_resource, metric_readers=[_metric_reader])
+metrics.set_meter_provider(_meter_provider)
+
+# Set up Traces (Spans)
+_tracer_provider = TracerProvider(resource=_resource)
+_tracer_provider.add_span_processor(BatchSpanProcessor(_span_exporter))
+trace.set_tracer_provider(_tracer_provider)
+
+# Create a Meter
+meter = metrics.get_meter("serenity_meter", version="1.0.0")
+
+intent_counter = meter.create_counter(
+    name="serenity.intent.count",
+    description="Count of classified intents",
+    unit="1",
+)
+
+message_length_histogram = meter.create_histogram(
+    name="serenity.message.length",
+    description="Character length of user messages",
+    unit="characters",
+)
+
+http_request_counter = meter.create_counter(
+    name="serenity.http.requests",
+    description="Count of HTTP requests by endpoint and status",
+    unit="1",
+)
+
+feedback_counter = meter.create_counter(
+    name="serenity.feedback.votes",
+    description="Count of user feedback votes",
+    unit="1",
+)
+
+# Start System Metrics (CPU/RAM) Collection
+SystemMetricsInstrumentor().instrument()
 
 # ------------------------------------------------------------------------------
 # 1. Environment Loading & Configuration
@@ -231,9 +310,9 @@ def validate_environment() -> None:
 # 4. FastAPI Application Setup
 # ------------------------------------------------------------------------------
 app = FastAPI(
-    title="Serene AI - Empowering Mental Health Support API",
+    title="Sanad AI - Empowering Mental Health Support API",
     description=(
-        "🌿 **Serene AI API Engine**\n\n"
+        "🌿 **Sanad AI API Engine**\n\n"
         "An advanced, multi-layered mental health support backend leveraging:\n"
         "- **BGE Reranker V2 M3** & BM25 Hybrid Retrieval\n"
         "- **XLM-RoBERTa** & custom local models for multilingual emotion/intent classification\n"
@@ -246,6 +325,18 @@ app = FastAPI(
 )
 
 is_production = bool(config.TURSO_DATABASE_URL)
+
+FastAPIInstrumentor.instrument_app(app)
+
+@app.middleware("http")
+async def track_requests(request: Request, call_next):
+    response = await call_next(request)
+    http_request_counter.add(1, {
+        "method": request.method,
+        "endpoint": request.url.path,
+        "status_code": str(response.status_code),
+    })
+    return response
 
 app.add_middleware(
     CORSMiddleware,
@@ -768,7 +859,7 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         raise HTTPException(
             status_code=500, detail=error_response or "Failed to generate a response."
         )
-
+    
     _save_chat_interaction(
         user_id=int(user_id),
         query=query_text,
@@ -778,6 +869,11 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         intent=result.get("intent"),
         resources=result.get("resources", []),
     )
+
+    # Record OTel metrics
+    message_length_histogram.record(len(query_text))
+    if result and "intent" in result:
+        intent_counter.add(1, {"intent": result.get("intent", "unknown")})
 
     return ChatResponse(
         answer=result["answer"],
@@ -811,6 +907,7 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
 
     answer = str(result.get("answer", "")).strip() or "Failed to generate a response."
     resources = result.get("resources", [])
+    
     _save_chat_interaction(
         user_id=int(user_id),
         query=query_text,
@@ -832,9 +929,9 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
         )
         yield _sse_event("start", {"status": "streaming"})
 
-        for chunk in _split_stream_chunks(answer, chunk_size=18):
+        for chunk in _split_stream_chunks(answer, chunk_size=1):
             yield _sse_event("chunk", {"text": chunk})
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.03)
 
         yield _sse_event("citations", {"resources": resources})
         yield _sse_event("done", {"status": "done"})

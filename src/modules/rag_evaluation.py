@@ -50,9 +50,9 @@ else:
 DEFAULT_JUDGE_MODEL = os.getenv(
     "GROQ_EVALUATION_MODEL", os.getenv("EVALUATION_LLM_MODEL", "llama-3.1-8b-instant")
 )
-DEFAULT_EVAL_PROJECT = os.getenv("LANGSMITH_PROJECT", "serene-rag-evaluation")
+DEFAULT_EVAL_PROJECT = os.getenv("LANGSMITH_PROJECT", "sanad-rag-evaluation")
 DEFAULT_EVAL_EXPERIMENT_PREFIX = os.getenv(
-    "LANGSMITH_EXPERIMENT_PREFIX", "serene-rag-eval"
+    "LANGSMITH_EXPERIMENT_PREFIX", "sanad-rag-eval"
 )
 DEFAULT_DATASET_UPLOAD_BATCH_SIZE = int(os.getenv("LANGSMITH_EXAMPLE_BATCH_SIZE", "25"))
 _groq_client = None
@@ -305,7 +305,7 @@ def _ensure_langsmith_dataset(
     except Exception:
         dataset = client.create_dataset(
             dataset_name=dataset_name,
-            description=description or "Serene AI RAG evaluation dataset.",
+            description=description or "Sanad AI RAG evaluation dataset.",
             metadata={"source": "src/modules/rag_evaluation.py"},
         )
 
@@ -524,7 +524,7 @@ def run_evaluation(
             evaluators=evaluators,
             experiment_prefix=experiment_prefix,
             description=(
-                "Serene AI RAG evaluation with retrieval relevance, groundedness, "
+                "Sanad AI RAG evaluation with retrieval relevance, groundedness, "
                 "answer relevance, and correctness."
             ),
             metadata={
@@ -591,7 +591,7 @@ def run_evaluation(
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Evaluate the Serene AI RAG system with LangSmith tracing."
+        description="Evaluate the Sanad AI RAG system with LangSmith tracing."
     )
     parser.add_argument(
         "--dataset",

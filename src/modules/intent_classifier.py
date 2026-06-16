@@ -1,3 +1,4 @@
+import re
 from typing import Callable, Literal
 
 import dspy
@@ -8,6 +9,155 @@ from pydantic import BaseModel, Field
 # Locate project root and load environment
 from ..config import config
 from ..prompts.prompts import IntentClassifierModule
+
+
+# =============================================================================
+# FIGURATIVE / IDIOMATIC EXPRESSION GUARDRAIL
+# =============================================================================
+# This comprehensive list catches figurative, idiomatic, and slang expressions
+# that contain words like "death", "kill", "die", etc. but are NOT crisis.
+# These patterns are checked BEFORE any ML classifier runs.
+# =============================================================================
+
+# Compiled regex patterns for figurative expressions across languages
+# Each pattern is designed to match non-literal uses of death/harm words
+_FIGURATIVE_PATTERNS = [
+    # ---- Arabic figurative / slang (Egyptian, Levantine, Gulf, Maghreb) ----
+    # "بموت في X" / "بموت من X" = I'm crazy about X / dying of X (love, laughter, etc.)
+    re.compile(r'بم[وؤ]*ت\s+(في|فى|من|على|عليك|عليكي|عليها|عليه|فيك|فيكي|فيها|فيه)', re.IGNORECASE),
+    # "أموت في" / "أموت من" / "موت في"
+    re.compile(r'[اأ]?م[وؤ]*ت\s+(في|فى|من|على|فيك|فيكي|فيها|فيه|عليك|عليكي)', re.IGNORECASE),
+    # "هموت من الضحك" / "هموت من الحب"
+    re.compile(r'هم[وؤ]*ت\s+(من|في|فى|على)', re.IGNORECASE),
+    # "ميت من الضحك" / "ميتة من الخجل"
+    re.compile(r'مي[تة]+\s+(من|في|فى|على)', re.IGNORECASE),
+    # "يقتلني" = it kills me (figurative)
+    re.compile(r'(بي|ي|ت)قتل(ني|نا|ك|ها|ه)', re.IGNORECASE),
+    # "بحبك موت" = I love you to death
+    re.compile(r'(بحبك?|بعشقك?|حبيبي|حبيبتي)\s*(موت|اموت|بموت)', re.IGNORECASE),
+    re.compile(r'(موت|أموت|بموت)\s*(حب|عشق|ضحك|خجل|فرح|غيرة|جوع|برد|حر)', re.IGNORECASE),
+    # "الشوق قاتلني" = longing is killing me
+    re.compile(r'(الشوق|الحب|العشق|الضحك|الجوع|البرد|الحر)\s*(قاتل|بيقتل|يقتل)', re.IGNORECASE),
+    # "ده يجنن" / "بتجنن" = this drives me crazy (positive)
+    re.compile(r'(بتجنن|يجنن|مجنون\s*في|مجنونة\s*في)', re.IGNORECASE),
+
+    # ---- English figurative / slang ----
+    re.compile(r'(?:i\'?m\s+)?dying\s+(?:to|for|of|from|over|about)\b', re.IGNORECASE),
+    re.compile(r'\b(?:kills?|killing|killed)\s+(?:me|it|the\s+game|the\s+vibe)\b', re.IGNORECASE),
+    re.compile(r'\bdead\s*(?:ass)?\b', re.IGNORECASE),
+    re.compile(r'\bi\'?m\s+dead\b', re.IGNORECASE),
+    re.compile(r'\bdying\s+(?:laughing|of\s+laughter|rn|right\s+now)\b', re.IGNORECASE),
+    re.compile(r'\bliterally\s+(?:dying|dead|killed\s+me)\b', re.IGNORECASE),
+    re.compile(r'\bto\s+die\s+for\b', re.IGNORECASE),
+    re.compile(r'\bkill(?:s|ed|ing)?\s+(?:the\s+)?(?:game|vibe|it|beat|performance|look)\b', re.IGNORECASE),
+    re.compile(r'\bdrop\s*dead\s+gorgeous\b', re.IGNORECASE),
+    re.compile(r'\bslaying\b', re.IGNORECASE),
+    re.compile(r'\bkiller\s+(?:outfit|look|smile|move|song|beat|recipe|deal)\b', re.IGNORECASE),
+    re.compile(r'\blove\s+(?:you|him|her|them|it)\s+to\s+(?:death|pieces|bits)\b', re.IGNORECASE),
+    re.compile(r'\bcrazy\s+(?:about|for|over)\b', re.IGNORECASE),
+    re.compile(r'\bhead\s+over\s+heels\b', re.IGNORECASE),
+    re.compile(r'\bover\s+the\s+moon\b', re.IGNORECASE),
+    re.compile(r'\bdying\s+(?:inside\s+)?(?:from|of)\s+(?:embarrassment|cringe|laughter|boredom|curiosity|excitement|anticipation|hunger|thirst)\b', re.IGNORECASE),
+    re.compile(r'\bkill(?:ing)?\s+(?:time|two\s+birds)\b', re.IGNORECASE),
+    re.compile(r'\bwould\s+(?:kill|die)\s+for\s+(?:a|some|that|this)\b', re.IGNORECASE),
+    re.compile(r'\b(?:scared|bored|embarrassed|starving|freezing)\s+to\s+death\b', re.IGNORECASE),
+    re.compile(r'\b(?:tickled|worried|worked)\s+to\s+death\b', re.IGNORECASE),
+
+    # ---- French figurative ----
+    re.compile(r'\bmourir\s+de\s+(?:rire|faim|soif|froid|chaud|honte|jalousie|ennui|envie|peur|amour)\b', re.IGNORECASE),
+    re.compile(r"\bje\s+(?:meurs?|crève)\s+(?:de|d')\s*(?:rire|faim|soif|froid|chaud|honte|envie|amour)", re.IGNORECASE),
+    re.compile(r'\bc\'?est\s+(?:à\s+)?mourir\s+de\s+rire\b', re.IGNORECASE),
+    re.compile(r'\btu\s+me\s+(?:tues?|achèves?)\b', re.IGNORECASE),
+    re.compile(r'\bje\s+(?:suis\s+)?(?:mort(?:e)?|crevé(?:e)?)\s+de\s+rire\b', re.IGNORECASE),
+    re.compile(r'\bje\s+(?:t\'?aime|l\'?adore)\s+à\s+(?:mourir|en\s+mourir)\b', re.IGNORECASE),
+    re.compile(r'\bfou(?:lle)?\s+(?:de|d\')\b', re.IGNORECASE),
+
+    # ---- Spanish figurative ----
+    re.compile(r'\bme\s+muero\s+(?:de|por)\s+(?:risa|hambre|sed|frío|calor|vergüenza|amor|ganas|sueño|celos|miedo|emoción)\b', re.IGNORECASE),
+    re.compile(r'\bme\s+(?:mata(?:s)?|encanta|fascina)\b', re.IGNORECASE),
+    re.compile(r'\bestoy\s+(?:muerto|muerta)\s+de\s+(?:risa|hambre|sueño|cansancio|frío|calor)\b', re.IGNORECASE),
+    re.compile(r'\bme\s+muero\s+por\s+(?:ti|él|ella|eso|esto|comer|ver|ir|salir|conocer)\b', re.IGNORECASE),
+    re.compile(r'(?:^|\s)loc[oa]\s+por\b', re.IGNORECASE),
+
+    # ---- German figurative ----
+    re.compile(r'\bich\s+(?:sterbe|krepiere)\s+vor\s+(?:lachen|hunger|durst|kälte|hitze|langeweile|neugier|angst|scham|liebe|sehnsucht)\b', re.IGNORECASE),
+    re.compile(r'\btotlachen\b', re.IGNORECASE),
+    re.compile(r'\bzum\s+(?:tot|sterben|schreien)\b', re.IGNORECASE),
+    re.compile(r'\bich\s+(?:bin|war)\s+(?:gestorben|tot)\s+vor\s+lachen\b', re.IGNORECASE),
+    re.compile(r'\bverrückt\s+nach\b', re.IGNORECASE),
+
+    # ---- Italian figurative ----
+    re.compile(r'(?:morire|muoio|moriamo)\s+(?:dal|di|dalle|da)\s+(?:ridere|risate|fame|sete|freddo|caldo|vergogna|sonno|noia|invidia|gelosia|amore)', re.IGNORECASE),
+    re.compile(r'\bsto\s+morendo\s+(?:dal|di|dalle|da)\s+(?:ridere|fame|sete|freddo|caldo|sonno|noia)\b', re.IGNORECASE),
+    re.compile(r'\bmi\s+(?:uccide|ammazza)\b', re.IGNORECASE),
+    re.compile(r'(?:^|\s)pazz[oa]\s+(?:di|per)\b', re.IGNORECASE),
+
+    # ---- Portuguese figurative ----
+    re.compile(r'\b(?:tô|estou|to)\s+morrendo\s+de\s+(?:rir|fome|sede|frio|calor|vergonha|sono|tédio|medo|vontade|saudade|amor|ciúmes?)\b', re.IGNORECASE),
+    re.compile(r'\bme\s+mata\b', re.IGNORECASE),
+    re.compile(r'(?:^|\s)louc[oa]\s+por', re.IGNORECASE),
+
+    # ---- Turkish figurative ----
+    re.compile(r'\b(?:gülmekten|açlıktan|soğuktan|sıcaktan|sıkıntıdan|utançtan|uykusuzluktan|meraktan|korkudan|heyecandan|özlemden)\s+(?:öl|ölü|ölüyorum|ölüyoruz|öleceğim|ölecek)\b', re.IGNORECASE),
+    re.compile(r'\böl[üu]yorum\s+(?:gülmekten|açlıktan|sıkıntıdan)\b', re.IGNORECASE),
+    re.compile(r'\b(?:seni|onu|bunu)\s+(?:çok|aşırı|delicesine)\s+(?:seviyorum|istiyorum)\b', re.IGNORECASE),
+    re.compile(r'\bdeli\s+(?:gibi|oldum|oluyor)\b', re.IGNORECASE),
+
+    # ---- Japanese figurative ----
+    re.compile(r'(?:笑い|恥ずかし|お腹|寒|暑|退屈|恋|好き|嬉し)(?:すぎ|で)(?:て)?(?:死|し)(?:ぬ|にそう|んだ|んでる)', re.IGNORECASE),
+    re.compile(r'ウケ(?:る|死)', re.IGNORECASE),
+    re.compile(r'(?:可愛|かわい|美味|うま|旨|最高|ヤバ|やば)(?:すぎ|くて)(?:て)?(?:死|し)(?:ぬ|にそう|んだ)', re.IGNORECASE),
+
+    # ---- Chinese figurative ----
+    re.compile(r'(?:笑|饿|冷|热|无聊|尴尬|想|爱|喜欢|紧张|兴奋|好吃|好看|可爱)(?:死|得要死|到死|得要命)', re.IGNORECASE),
+    re.compile(r'我(?:太|好)?(?:爱|喜欢|迷)(?:死)?(?:了|你|他|她|它)', re.IGNORECASE),
+
+    # ---- Korean figurative (bonus for robustness) ----
+    re.compile(r'(?:웃겨|배고파|추워|더워|졸려|지루해|부끄러워|긴장돼)\s*(?:죽겠|죽을 것 같)', re.IGNORECASE),
+
+    # ---- Urdu figurative ----
+    re.compile(r'(?:ہنسی|بھوک|پیاس|سردی|گرمی|شرم|محبت|خوشی)\s*(?:سے|کی)\s*(?:مر|مار)', re.IGNORECASE),
+
+    # ---- Hindi figurative ----
+    re.compile(r'(?:हंसी|भूख|प्यास|ठंड|गर्मी|शर्म|प्यार|खुशी)\s*(?:से|की)\s*(?:मर|मार)', re.IGNORECASE),
+    re.compile(r'(?:मर\s+रहा|मर\s+रही)\s+(?:हूं|हूँ)\s+(?:हंसी|भूख|प्यास|ठंड|गर्मी|शर्म)\s*(?:से|में)', re.IGNORECASE),
+
+    # ---- Russian figurative ----
+    re.compile(r'(?:умира|помира|сдох)\w*\s+(?:со\s+смеху|от\s+(?:смеха|голода|холода|жары|скуки|стыда|любви|нетерпения|страха|зависти|любопытства))', re.IGNORECASE),
+    re.compile(r'(?:убивает|убила|убил)\s+(?:меня|наповал)', re.IGNORECASE),
+    re.compile(r'(?:без\s+ума|схожу\s+с\s+ума|сума\s+сходить)\s+(?:от|по)', re.IGNORECASE),
+
+    # ---- Vietnamese figurative ----
+    re.compile(r'(?:chết|chết mất)\s+(?:cười|đói|khát|lạnh|nóng|buồn|ngủ|mệt|nhớ|yêu|thương|vui)', re.IGNORECASE),
+
+    # ---- Swahili figurative ----
+    re.compile(r'\bninakufa\s+(?:kwa\s+)?(?:kicheko|njaa|kiu|baridi|joto|aibu|upendo|furaha)\b', re.IGNORECASE),
+
+    # ---- Thai figurative ----
+    re.compile(r'(?:ตาย|ตายแล้ว)(?:ขำ|หัวเราะ|หิว|เหนื่อย|ร้อน|หนาว|อาย|รัก|ง่วง)', re.IGNORECASE),
+
+    # ---- Polish figurative ----
+    re.compile(r'\bumieram\s+(?:ze|z)\s+(?:śmiechu|głodu|pragnienia|zimna|gorąca|nudy|wstydu|ciekawości|strachu|miłości|zazdrości)\b', re.IGNORECASE),
+
+    # ---- Dutch figurative ----
+    re.compile(r'\bik\s+ga\s+dood\s+(?:van|van\s+het)\s+(?:lachen|honger|dorst|kou|warmte|verveling|schaamte|liefde|nieuwsgierigheid)\b', re.IGNORECASE),
+
+    # ---- Greek figurative ----
+    re.compile(r'(?:πεθαίνω|σκοτώνομαι)\s+(?:στα\s+γέλια|από\s+(?:τα\s+γέλια|πείνα|δίψα|κρύο|ζέστη|ντροπή|αγάπη|περιέργεια))', re.IGNORECASE),
+    re.compile(r'\bτρελός\s+(?:για|με)\b', re.IGNORECASE),
+]
+
+
+def is_figurative_expression(text: str) -> bool:
+    """Check if text contains figurative/idiomatic use of death/harm words.
+    
+    Returns True if the text matches known figurative patterns, meaning
+    it should NOT be classified as crisis or mental health.
+    """
+    for pattern in _FIGURATIVE_PATTERNS:
+        if pattern.search(text):
+            return True
+    return False
 
 
 class Intent(BaseModel):
@@ -145,26 +295,137 @@ class IntentClassifier:
                 "谢谢",
             ],
             "out_of_scope": [
+                # General off-topic (English)
                 "what is the weather like",
                 "tell me a joke",
                 "what is the latest news",
                 "what sports scores are",
+                "what is the capital of France",
+                "how to cook pasta",
+                "write me a python script",
+                "solve this math problem",
+                "who won the world cup",
+                "what time is it",
+                "recommend a movie",
+                "what is machine learning",
+                "tell me about history",
+                "how does a car engine work",
+                "what is the stock price of apple",
+                "translate this to French",
+                "help me with my homework",
+                "write an essay about climate change",
+                "how to fix a leaky faucet",
+                "best restaurants near me",
+                # Figurative / slang (English) — NOT crisis
+                "I'm dying for a pizza",
+                "this song kills me",
+                "I'm dead, that was so funny",
+                "she's killing it on stage",
+                "dying of laughter right now",
+                "I would kill for some coffee",
+                "that joke killed me",
+                "I'm dying to see that movie",
+                "drop dead gorgeous",
+                "love you to death",
+                "bored to death",
+                "scared to death of spiders",
+                "starving to death over here",
+                "he's crazy about her",
+                "I'm over the moon",
+                "killing time at the airport",
+                # Figurative / slang (Arabic) — NOT crisis
+                "أنا بموت في مازن",
+                "بموت فيك يا حبيبي",
+                "بموت من الضحك",
+                "بمووت في الأكل ده",
+                "أنا بموت على الشوكولاتة",
+                "هموت من الضحك",
+                "ميتة من الخجل",
+                "الأغنية دي بتقتلني",
+                "مجنون فيها",
+                "بحبك موت",
+                "الشوق قاتلني",
+                "أنا بموت في الأكل الحار",
+                "بموت عليكي",
+                "ده يجنن من جماله",
+                # Figurative / slang (French) — NOT crisis
+                "je meurs de rire",
+                "c'est à mourir de rire",
+                "tu me tues avec tes blagues",
+                "je suis mort de rire",
+                "je meurs de faim",
+                "je t'aime à mourir",
+                "fou de toi",
+                # Figurative / slang (Spanish) — NOT crisis
+                "me muero de risa",
+                "me muero de hambre",
+                "me muero por ti",
+                "me mata tu sonrisa",
+                "estoy muerto de risa",
+                "loca por él",
+                # Figurative / slang (German) — NOT crisis
+                "ich sterbe vor lachen",
+                "ich sterbe vor hunger",
+                "das ist zum totlachen",
+                "verrückt nach dir",
+                # Figurative / slang (Italian) — NOT crisis
+                "muoio dal ridere",
+                "sto morendo di fame",
+                "mi uccide questa canzone",
+                "pazza di te",
+                # Figurative / slang (Portuguese) — NOT crisis
+                "tô morrendo de rir",
+                "morrendo de fome",
+                "louca por você",
+                # Figurative / slang (Turkish) — NOT crisis
+                "gülmekten öldüm",
+                "açlıktan ölüyorum",
+                "seni çok seviyorum",
+                # Figurative / slang (Russian) — NOT crisis
+                "умираю со смеху",
+                "убила меня этим",
+                "без ума от тебя",
+                # Figurative / slang (Chinese) — NOT crisis
+                "笑死我了",
+                "饿死了",
+                "好看死了",
+                "我太爱了",
+                # Figurative / slang (Japanese) — NOT crisis
+                "笑いすぎて死にそう",
+                "お腹すいて死にそう",
+                "可愛すぎて死ぬ",
+                # General off-topic (Arabic)
                 "ما هو الطقس اليوم",
                 "اخبرني بنكتة",
                 "ما هي آخر الأخبار",
+                "ما هي عاصمة فرنسا",
+                "كيف أطبخ المعكرونة",
+                "من فاز بكأس العالم",
+                # General off-topic (Urdu)
                 "آج موسم کیسا ہے",
                 "مجھے لطیفہ سنائیں",
                 "تازہ ترین خبریں کیا ہیں",
+                # General off-topic (French)
                 "quel temps fait-il",
                 "raconte-moi une blague",
+                # General off-topic (Spanish)
                 "cómo está el clima",
                 "cuéntame un chiste",
+                # Romance / relationship (not mental health)
+                "I love my girlfriend so much",
+                "أنا بحب خطيبتي أوي",
+                "je suis amoureux d'elle",
+                "estoy enamorado de ella",
             ],
             "asking_mental_health_question": [
                 "I feel anxious and need help",
                 "I am depressed",
                 "can you help me with my stress",
                 "I need therapy advice",
+                "I've been feeling really down lately",
+                "how to deal with panic attacks",
+                "what are signs of burnout",
+                "I can't sleep because of worry",
                 "أشعر بالقلق وأحتاج إلى مساعدة",
                 "أنا مكتئب وأحتاج للتحدث مع شخص ما",
                 "ساعدني في التغلب على التوتر",
@@ -246,6 +507,26 @@ class IntentClassifier:
             }
 
     def classify(self, text: str, language: str = "English") -> Intent:
+        # =================================================================
+        # GUARDRAIL LAYER 0: Figurative / Idiomatic Expression Pre-Check
+        # =================================================================
+        # This runs BEFORE any ML model. It catches slang like:
+        #   - "أنا بموت في مازن" (I'm crazy about Mazen)
+        #   - "I'm dying for pizza"
+        #   - "je meurs de rire" (I'm dying of laughter)
+        #   - "me muero de hambre" (I'm dying of hunger)
+        # These are NOT crisis, NOT mental health — they are out_of_scope.
+        # =================================================================
+        if is_figurative_expression(text):
+            print(
+                f"---> [Intent Classifier] GUARDRAIL: Figurative/idiomatic expression detected. Classifying as 'out_of_scope'."
+            )
+            return Intent(
+                type="out_of_scope",
+                confidence=0.99,
+                classifier="embedding",
+            )
+
         # Run embedding classifier for all languages since we now use a multilingual embedding model
         embedding_intent = self._embedding_classifier(text)
         
@@ -254,26 +535,28 @@ class IntentClassifier:
             # If the predicted intent is crisis but confidence is below 85%, route to LLM fallback
             if embedding_intent.type == "crisis" and embedding_intent.confidence < 0.85:
                 print(
-                    f"--> [Intent Classifier] Embedding classified as crisis but confidence {embedding_intent.confidence:.5f} is below 85%. Routing to LLM fallback."
+                    f"---> [Intent Classifier] Embedding classified as crisis but confidence {embedding_intent.confidence:.5f} is below 85%. Routing to LLM fallback."
                 )
                 resolved_intent = self.llm_fallback(text)
             else:
                 print(
-                    f"--> [Intent Classifier] Classified intent as '{embedding_intent.type}' with confidence {embedding_intent.confidence:.5f} using embedding classifier."
+                    f"---> [Intent Classifier] Classified intent as '{embedding_intent.type}' with confidence {embedding_intent.confidence:.5f} using embedding classifier."
                 )
                 resolved_intent = embedding_intent
         else:
             # LLM fallback
             resolved_intent = self.llm_fallback(text)
 
-        # Post-classification safety override:
+        # =================================================================
+        # GUARDRAIL LAYER 3: Post-Classification Crisis Safety Override
+        # =================================================================
         # If the resolved intent is "crisis", but detect_crisis(text) is False,
         # override it to "asking_mental_health_question".
         if resolved_intent.type == "crisis":
             from .rag import detect_crisis
             if not detect_crisis(text):
                 print(
-                    f"--> [Intent Classifier] Overriding intent 'crisis' to 'asking_mental_health_question' because detect_crisis returned False."
+                    f"---> [Intent Classifier] Overriding intent 'crisis' to 'asking_mental_health_question' because detect_crisis returned False."
                 )
                 resolved_intent.type = "asking_mental_health_question"
                 resolved_intent.confidence = 0.90

@@ -13,6 +13,26 @@
 
 services:
   # ---------------------------------------------------------------------------
+  # Database — Local LibSQL (SQLite-compatible server)
+  # ---------------------------------------------------------------------------
+  libsql:
+    image: ghcr.io/tursodatabase/libsql-server:latest
+    container_name: sanad-ai-db
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      - SQLD_NODE=primary
+
+    volumes:
+      - sqlite-db:/var/lib/sqld
+
+    networks:
+      - sanad-network
+
+  # ---------------------------------------------------------------------------
   # Backend — FastAPI + RAG pipeline
   # ---------------------------------------------------------------------------
   backend:
@@ -28,6 +48,10 @@ services:
 
     environment:
       - PYTHONUNBUFFERED=1 # Ensure real-time log output
+      - TURSO_DATABASE_URL=http://libsql:8080
+      - TURSO_AUTH_TOKEN=
+      - QDRANT_URL=
+      - QDRANT_API_KEY=
 
     volumes:
       - backend-artifacts:/app/artifacts # Persist downloaded HF models
@@ -35,6 +59,10 @@ services:
 
     networks:
       - sanad-network
+
+    depends_on:
+      libsql:
+        condition: service_started
 
     healthcheck:
       test: [ "CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')" ]
@@ -110,3 +138,5 @@ volumes:
     name: sanad-backend-artifacts
   backend-qdrant:
     name: sanad-backend-qdrant
+  sqlite-db:
+    name: sanad-sqlite-db

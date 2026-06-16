@@ -161,6 +161,27 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.condense_module.assert_called_once()
         self.rag.grounded_module.assert_called_once()
 
+    def test_query_clears_resources_on_fallback_message(self):
+        """Verify that resources are cleared when the response is the insufficient information fallback message."""
+        mock_doc = Document(
+            page_content="Mock question", metadata={"response": "Mock answer"}
+        )
+        self.rag.ensemble_retriever = MagicMock()
+        self.rag.ensemble_retriever.invoke.return_value = [mock_doc]
+        self.rag.rerank_documents = MagicMock(return_value=[0.99])
+
+        # Test with straight apostrophes
+        self.rag.grounded_module = MagicMock(return_value="I'm sorry, I don't have enough information to answer that.")
+        output = self.rag.query("some query")
+        self.assertEqual(output["answer"], "I'm sorry, I don't have enough information to answer that.")
+        self.assertEqual(output["resources"], [])
+
+        # Test with curly apostrophes
+        self.rag.grounded_module = MagicMock(return_value="I’m sorry, I don’t have enough information to answer that.")
+        output = self.rag.query("some query")
+        self.assertEqual(output["answer"], "I’m sorry, I don’t have enough information to answer that.")
+        self.assertEqual(output["resources"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

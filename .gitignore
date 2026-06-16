@@ -234,3 +234,7 @@ NLP Final Project.pdf
 *.tfstate.backup
 .terraform.lock.hcl
 terraform/terraform.tfvars
+
+*.sqlite3
+*.sqlite
+*.db

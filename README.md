@@ -1,19 +1,27 @@
 # 🧠 Sanad (سند) — Empathetic Mental Health RAG Chatbot
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.12-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
-  <img src="https://img.shields.io/badge/FastAPI-0.111.0-green.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/Qdrant-1.18.0-red.svg?style=for-the-badge&logo=qdrant&logoColor=white" alt="Qdrant" />
-  <img src="https://img.shields.io/badge/LangSmith-Observability-blue.svg?style=for-the-badge&logo=python&logoColor=white" alt="LangSmith" />
-  <img src="https://img.shields.io/badge/DSPy-Prompt%20Programming-lightgrey.svg?style=for-the-badge&logo=python&logoColor=blue" alt="DSPy" />
-  <img src="https://img.shields.io/badge/Groq-LLM%20API-yellow.svg?style=for-the-badge&logo=google&logoColor=black" alt="Groq LLM" />
+  <img src="https://img.shields.io/badge/Python-3.12-3776AB.svg?style=for-the-badge&logo=python&logoColor=white" alt="Python Version" />
+  <img src="https://img.shields.io/badge/FastAPI-0.111.0-009688.svg?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Qdrant-1.18.0-FF4B4B.svg?style=for-the-badge&logo=qdrant&logoColor=white" alt="Qdrant" />
+  <img src="https://img.shields.io/badge/Turso_DB-libSQL-4630EB.svg?style=for-the-badge&logo=sqlite&logoColor=white" alt="Turso Database" />
+  <img src="https://img.shields.io/badge/SQLite-Local_Fallback-003B57.svg?style=for-the-badge&logo=sqlite&logoColor=white" alt="SQLite" />
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Tests-25%20Passed-brightgreen.svg?style=flat-square" alt="Unit Tests" />
-  <img src="https://img.shields.io/badge/ONNX-Runtime-blue.svg?style=flat-square" alt="ONNX Runtime" />
-  <img src="https://img.shields.io/badge/FastEmbed-Lightning-yellow.svg?style=flat-square" alt="FastEmbed" />
-  <img src="https://img.shields.io/badge/Embeddings-BGE%20Small%20en-orange.svg?style=flat-square" alt="BGE Embeddings" />
+  <img src="https://img.shields.io/badge/Terraform-1.8%2B-7B42BC.svg?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform" />
+  <img src="https://img.shields.io/badge/AWS-EC2_/_VPC-FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS" />
+  <img src="https://img.shields.io/badge/Docker_Compose-Multi_Container-2496ED.svg?style=for-the-badge&logo=docker&logoColor=white" alt="Docker Compose" />
+  <img src="https://img.shields.io/badge/GitHub_Actions-CI_/_CD-2088FF.svg?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/DSPy-GEPA_Compiled-000000.svg?style=for-the-badge&logo=python&logoColor=3776AB" alt="DSPy" />
+  <img src="https://img.shields.io/badge/Groq-LLM_API-F55036.svg?style=for-the-badge&logo=google&logoColor=white" alt="Groq LLM" />
+  <img src="https://img.shields.io/badge/LangSmith-Observability-0052FF.svg?style=for-the-badge&logo=python&logoColor=white" alt="LangSmith" />
+  <img src="https://img.shields.io/badge/ONNX_Runtime-Inference-005C8A.svg?style=for-the-badge&logo=onnx&logoColor=white" alt="ONNX Runtime" />
+  <img src="https://img.shields.io/badge/FastEmbed-Lightning-FFCA28.svg?style=for-the-badge&logo=python&logoColor=black" alt="FastEmbed" />
+  <img src="https://img.shields.io/badge/Ragas-Evaluation-D32F2F.svg?style=for-the-badge&logo=pytest&logoColor=white" alt="Ragas" />
 </p>
 
 ---
@@ -118,11 +126,11 @@ graph TD
     *   Optional translation pipeline (`Helsinki-NLP/opus-mt-mul-en`) to translate queries before retrieval and enforce responses in the user's native language.
 *   **📈 Integrated Evaluation Suite**:
     *   Fully integrated with **DeepEval** and **Ragas** to assess answer faithfulness, relevancy, factual correctness, and context recall.
+*   **⚡ Smooth Character-by-Character SSE Streaming**: Optimized `/chat/stream` chunking to yield single-character updates with precise sleep intervals, delivering an ultra-responsive, natural typing effect on the frontend.
+*   **📦 Multi-Container Docker Compose Stack**: Orchestrated a local development and production-ready container stack comprising the FastAPI backend, a production-grade Nginx frontend server, and a local LibSQL (Turso-compatible) database container for reliable multi-service orchestration.
 *   **☁️ Lightweight Cloud-Ready Deployment**:
     *   The complete `artifacts/` folder (1.1GB+ of vectorizers, databases, and ONNX models) is hosted remotely on Hugging Face ([`mazen248/sanad-ai-artifacts`](https://huggingface.co/mazen248/sanad-ai-artifacts/tree/main)).
     *   An automated startup downloader (`huggingface_hub`) intelligently fetches only the missing required artifacts at runtime, keeping the GitHub repository footprint extremely small and enabling instant deployment to platforms like Render, AWS, or Heroku.
-
----
 
 ## 📂 Project Structure
 
@@ -272,6 +280,16 @@ docker pull mazen1393/sanad-ai-backend:latest
 docker run --env-file .env -p 8000:8000 mazen1393/sanad-ai-backend:latest
 ```
 
+### 🐳 Docker Compose Multi-Container Setup
+For a fully containerized orchestration including the FastAPI backend, Nginx web server frontend, and a local LibSQL (SQLite-compatible server) database container:
+
+1. Ensure you have your `.env` file configured in the root directory.
+2. Spin up the entire service stack in detached mode:
+   ```powershell
+   docker compose up -d --build
+   ```
+3. Open `http://localhost:3000` in your browser to access the frontend workspace, or check API documentation at `http://localhost:8000/docs`.
+
 ### Local Setup
 We recommend using [uv](https://github.com/astral-sh/uv) to manage project dependencies and virtual environments.
 
@@ -313,6 +331,10 @@ uv run pytest
 ## ☁️ AWS Cloud Deployment (Terraform & CI/CD)
 
 The application is deployed on a cost-effective, cloud-ready AWS infrastructure provisioned using **Terraform (modularized)** and fully automated using a **GitHub Actions CI/CD pipeline**.
+
+<p align="center">
+  <img src="Cloud infrastructure and CI-CD pipeline diagram.png" alt="Cloud Infrastructure and CI-CD Pipeline Diagram" width="900"/>
+</p>
 
 ### 🏗️ Infrastructure Architecture (Terraform)
 The infrastructure is modularized into three separate components:
@@ -398,14 +420,42 @@ We compared our baseline RAG pipelines (Approach 1 & Approach 2) against the fin
 - **Context Recall**: Verifies that the retriever fetches all necessary clinical advice needed to form an answer. Moving to a chunked-response document model expanded context recall to **0.89+**.
 - **Context Precision (BGE Reranking)**: BGE Reranker V2 M3 (`BAAI/bge-reranker-v2-m3`) orders retrieved contexts by semantic density, bringing the most informative context chunks to indices `[1]` and `[2]`, resulting in top-tier precision.
 
+### 🏷️ RAG Comparison Approaches
+
+The following architecture diagram outlines the RAG approaches tested (Approach 1: Vanilla Qdrant RAG, Approach 2: Query Translation RAG, and Approach 3: Chunked Response + BGE Hybrid Retrieval + NumPy Cosine Similarity Reranking):
+
+<p align="center">
+  <img src="metrics/rag_evaluation/rag_approaches.png" alt="RAG Comparison Approaches" width="850"/>
+</p>
+
+### 📈 RAG Evaluation Metrics Summary
+
+The RAGAS evaluation results show that the final hybrid retrieval and chunked response architecture (Approach 3) outperforms previous iterations, especially in Answer Relevancy, Faithfulness, and Context Recall:
+
+<p align="center">
+  <img src="metrics/rag_evaluation/summarized_rag_evaluation_metrics.png" alt="RAG Evaluation Metrics" width="750"/>
+</p>
+
+### 🛡️ DSPy Generalization & Overfit Analysis
+
+To ensure that the compiled DSPy signature prompts do not overfit to the training examples bootstrapped by the GEPA optimizer, we performed an extensive overfit and generalization audit across all five compiled modules (`IntentClassifierModule`, `RetrievalRouterModule`, `QueryCondenserModule`, `GroundedResponseModule`, and `GeneralConversationModule`).
+
+By evaluating both the baseline (unoptimized) and compiled (optimized) signatures across independent training and validation datasets, we observed that:
+* **Negligible Generalization Gap**: The difference between training and test performance remains extremely low (under 5% across all modules).
+* **Intent Classifier**: Achieved a **90.8%** mean score on the test set compared to **88.6%** on the training set (a generalization gap of **-2.1%**).
+* **Retrieval Router**: Reached a **89.3%** mean score on the test set vs **93.75%** on the train set (a gap of **4.4%**).
+* **Query Condenser**: Yielded an **89.17%** test score vs **91.25%** train score (a gap of **2.0%**).
+* **Grounded Response**: Recorded an **87.0%** test score vs **85.19%** train score (a gap of **-1.8%**).
+* **General Conversation**: Maintained a **90.45%** test score vs **91.0%** train score (a gap of **0.5%**).
+
+This confirms that the GEPA compiler successfully optimized instructions and few-shot examples that generalize robustly to unseen user queries, without overfitting.
+
+<p align="center">
+  <img src="metrics/dspy_overfit_analysis/01_optimized_train_vs_test.png" alt="DSPy Optimized Train vs Test Performance" width="750"/>
+</p>
+
+You can view the full overfit analysis logs, heatmap comparisons, and radar diagrams inside the `metrics/dspy_overfit_analysis/` directory.
+
 You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part2.ipynb) files.
 
----
 
-## 👥 Team Members
-
-This project was built and is maintained by:
-
-1.  **Ahmed Ashraf Abdulwahab Saleem**
-2.  **Mazen Mohamed Montaset Elsay**
-3.  **Peter Hany Fayez**

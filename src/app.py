@@ -805,9 +805,9 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
         )
         yield _sse_event("start", {"status": "streaming"})
 
-        for chunk in _split_stream_chunks(answer, chunk_size=18):
+        for chunk in _split_stream_chunks(answer, chunk_size=1):
             yield _sse_event("chunk", {"text": chunk})
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(0.03)
 
         yield _sse_event("citations", {"resources": resources})
         yield _sse_event("done", {"status": "done"})

@@ -564,6 +564,13 @@ class MentalHealthRAG:
             print(
                 f"--> [RAG Setup] Creating Qdrant collection '{self.collection_name}' and indexing documents..."
             )
+            # Close the temporary client connection to release the lock on local files
+            if not qdrant_url:
+                try:
+                    self.qdrant_client.close()
+                except Exception as e:
+                    print(f"--> [RAG Setup] Error closing temporary client: {e}")
+
             if qdrant_url:
                 self.vectorstore = QdrantVectorStore.from_documents(
                     documents,
@@ -581,6 +588,7 @@ class MentalHealthRAG:
                     collection_name=self.collection_name,
                     distance=Distance.COSINE,
                 )
+            self.qdrant_client = self.vectorstore.client
         else:
             print(
                 f"--> [RAG Setup] Qdrant collection '{self.collection_name}' already exists. Loading index..."
@@ -828,6 +836,11 @@ class MentalHealthRAG:
 
         # Safeguard: Apply medical disclaimer check
         answer = check_medical_advice(answer, language)
+
+        # Clear sources/resources if the answer is the insufficient information fallback message
+        normalized_answer = answer.strip().replace("’", "'").replace("‘", "'").rstrip(".")
+        if normalized_answer.lower() == "i'm sorry, i don't have enough information to answer that":
+            resources = []
 
         return {"answer": answer, "resources": resources}
 

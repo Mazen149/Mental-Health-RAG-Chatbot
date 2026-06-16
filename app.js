@@ -340,7 +340,11 @@ function addMessage(role, text) {
   const div = document.createElement("div");
   div.className = `message ${role}`;
 
+  const username = localStorage.getItem("sanad_username") || "User";
+  const initial = username.charAt(0).toUpperCase();
+
   div.innerHTML = `
+    <div class="avatar user-avatar">${initial}</div>
     <div class="bubble">${escapeHtml(text)}</div>`;
 
   chatArea.appendChild(div);
@@ -383,6 +387,7 @@ function addBotMessage(text, userMessage, resources = []) {
   }
 
   div.innerHTML = `
+    <div class="avatar bot-avatar">🌿</div>
     <div class="bubble-wrap">
       <div class="bubble markdown">${htmlContent}</div>
       ${sourcesHtml}
@@ -442,9 +447,12 @@ function showTyping(message = "") {
   div.className = "message bot";
   div.id = "typing";
   div.innerHTML = `
-    <div class="bubble">
-      ${message ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">${escapeHtml(message)}</div>` : ""}
-      <div class="typing-indicator"><span></span><span></span><span></span></div>
+    <div class="avatar bot-avatar">🌿</div>
+    <div class="bubble-wrap">
+      <div class="bubble">
+        ${message ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">${escapeHtml(message)}</div>` : ""}
+        <div class="typing-indicator"><span></span><span></span><span></span></div>
+      </div>
     </div>`;
   chatArea.appendChild(div);
   chatArea.scrollTop = chatArea.scrollHeight;
@@ -522,6 +530,7 @@ async function send() {
       botDiv.dataset.id = botMsgId;
 
       botDiv.innerHTML = `
+        <div class="avatar bot-avatar">🌿</div>
         <div class="bubble-wrap">
           <div class="bubble markdown"></div>
           <div class="sources-list" style="display: none;"></div>

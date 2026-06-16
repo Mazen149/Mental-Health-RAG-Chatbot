@@ -27,6 +27,7 @@ const logoutBtn = document.getElementById("logout-btn");
 const micBtn = document.getElementById("mic-btn");
 const recordingStatus = document.getElementById("recording-status");
 const recordingTimer = document.getElementById("recording-timer");
+const transcribingStatus = document.getElementById("transcribing-status");
 
 const STORAGE_KEY = "sanad_ai_settings";
 const defaults = {
@@ -70,6 +71,11 @@ let audioChunks = [];
 let recordingInterval = null;
 let recordingSeconds = 0;
 let micStream = null;
+
+let audioContext = null;
+let analyser = null;
+const SILENCE_THRESHOLD = 0.015;
+const SILENCE_DURATION_MS = 2000;
 
 // ── Session & Auth management ──
 
@@ -365,7 +371,7 @@ function addBotMessage(text, userMessage, resources = []) {
   // Replace citations [1], [2], etc.
   htmlContent = htmlContent.replace(/\[([0-9]+)\]/g, (match, num) => {
     const idx = parseInt(num) - 1;
-    return `<button class="citation-btn" data-idx="${idx}">[${num}]</button>`;
+    return `<button class="citation-btn" data-idx="${idx}">${num}</button>`;
   });
 
   let sourcesHtml = "";
@@ -593,7 +599,7 @@ async function send() {
                 bubbleEl.innerHTML = marked.parse(accumulatedAnswer.trim());
                 bubbleEl.innerHTML = bubbleEl.innerHTML.replace(/\[([0-9]+)\]/g, (match, num) => {
                   const idx = parseInt(num) - 1;
-                  return `<button class="citation-btn" data-idx="${idx}">[${num}]</button>`;
+                  return `<button class="citation-btn" data-idx="${idx}">${num}</button>`;
                 });
                 chatArea.scrollTop = chatArea.scrollHeight;
               } else if (currentEvent === "citations") {
@@ -711,6 +717,7 @@ async function startRecording() {
     
     input.style.display = "none";
     recordingStatus.style.display = "flex";
+    if (transcribingStatus) transcribingStatus.style.display = "none";
     
     recordingSeconds = 0;
     recordingTimer.textContent = "0s";
@@ -721,6 +728,46 @@ async function startRecording() {
         stopRecording();
       }
     }, 1000);
+
+    // Web Audio Analyser for Silence Detection
+    try {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const source = audioContext.createMediaStreamSource(micStream);
+      analyser = audioContext.createAnalyser();
+      analyser.fftSize = 512;
+      source.connect(analyser);
+
+      const dataArray = new Float32Array(analyser.fftSize);
+      let lastTimeSoundDetected = Date.now();
+
+      function checkSilence() {
+        if (!isRecording) return;
+        
+        analyser.getFloatTimeDomainData(dataArray);
+        
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+          sum += dataArray[i] * dataArray[i];
+        }
+        const rms = Math.sqrt(sum / dataArray.length);
+
+        if (rms > SILENCE_THRESHOLD) {
+          lastTimeSoundDetected = Date.now();
+        } else {
+          if (Date.now() - lastTimeSoundDetected > SILENCE_DURATION_MS) {
+            console.log("Silence detected for 2 seconds. Auto-stopping and transcribing...");
+            stopRecording();
+            return;
+          }
+        }
+        
+        requestAnimationFrame(checkSilence);
+      }
+      
+      requestAnimationFrame(checkSilence);
+    } catch (ae) {
+      console.warn("AudioContext setup failed, silence detection disabled:", ae);
+    }
     
   } catch (err) {
     console.error("Microphone recording start failed:", err);
@@ -739,12 +786,22 @@ function stopRecording() {
   isRecording = false;
   micBtn.classList.remove("recording");
   
-  input.style.display = "block";
   recordingStatus.style.display = "none";
+  if (transcribingStatus) {
+    transcribingStatus.style.display = "flex";
+  }
+
+  try {
+    if (audioContext && audioContext.state !== "closed") {
+      audioContext.close();
+    }
+  } catch (e) {}
+  audioContext = null;
+  analyser = null;
 }
 
 async function transcribeAudio(audioBlob) {
-  showTyping("Transcribing your voice...");
+  micBtn.disabled = true;
   
   try {
     const formData = new FormData();
@@ -758,8 +815,6 @@ async function transcribeAudio(audioBlob) {
       credentials: "include"
     });
     
-    hideTyping();
-    
     if (!res.ok) {
       throw new Error(`Failed to transcribe: ${res.statusText}`);
     }
@@ -771,8 +826,11 @@ async function transcribeAudio(audioBlob) {
       input.focus();
     }
   } catch (err) {
-    hideTyping();
     addError("Voice Transcription Error: " + err.message);
+  } finally {
+    micBtn.disabled = false;
+    if (transcribingStatus) transcribingStatus.style.display = "none";
+    input.style.display = "block";
   }
 }
 

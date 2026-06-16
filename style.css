@@ -37,6 +37,10 @@ html, body {
   overflow: hidden;
 }
 
+button, input, textarea, select {
+  font-family: inherit;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -473,6 +477,7 @@ html, body {
 }
 
 textarea {
+  font-family: var(--font);
   flex: 1;
   border: none;
   background: transparent;
@@ -757,6 +762,32 @@ textarea::placeholder {
   flex: 1;
 }
 
+.transcribing-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.transcribing-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.transcribing-text {
+  font-size: 0.9rem;
+  color: var(--primary);
+  font-weight: 600;
+}
+
 .recording-pulse {
   width: 8px;
   height: 8px;
@@ -790,32 +821,46 @@ textarea::placeholder {
 
 /* ── Citations & Drawer (Sources Only) ── */
 .citation-btn {
-  background: rgba(52, 211, 153, 0.08);
+  background: rgba(16, 157, 115, 0.12); /* transparent pine green */
   color: var(--primary);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-size: 0.75rem;
+  border-radius: 50%; /* perfect circle */
+  width: 16px;
+  height: 16px;
+  font-size: 0.66rem;
   font-weight: 700;
   cursor: pointer;
-  margin: 0 2px;
+  margin: 0 3px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: all 0.15s ease;
+  vertical-align: super; /* superscript style */
+  padding: 0;
+  line-height: 1;
 }
 
 .citation-btn:hover {
   background: var(--primary);
   color: #121212;
   border-color: var(--primary);
+  transform: scale(1.08);
 }
 
 .sources-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* Keep in 1 line */
   gap: 8px;
   align-items: center;
   margin-top: 12px;
   padding-top: 4px;
+  overflow-x: auto; /* scroll horizontally if long */
+  max-width: 100%;
+  scrollbar-width: none; /* hide scrollbar Firefox */
+}
+
+.sources-list::-webkit-scrollbar {
+  display: none; /* hide scrollbar Chrome/Safari */
 }
 
 .sources-title {

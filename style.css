@@ -850,10 +850,10 @@ textarea::placeholder {
 .sources-list {
   display: flex;
   flex-wrap: nowrap; /* Keep in 1 line */
-  gap: 8px;
+  gap: 5px;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 4px;
+  margin-top: 6px;
+  padding-top: 2px;
   overflow-x: auto; /* scroll horizontally if long */
   max-width: 100%;
   scrollbar-width: none; /* hide scrollbar Firefox */
@@ -866,27 +866,27 @@ textarea::placeholder {
 .sources-title {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.78rem;
+  gap: 3px;
+  font-size: 0.68rem;
   color: var(--text-secondary);
   font-weight: 700;
-  margin-right: 4px;
+  margin-right: 2px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.02em;
 }
 
 .source-chip {
   background: rgba(255, 255, 255, 0.03);
   color: #ececf1;
   border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 0.76rem;
+  border-radius: 12px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   transition: all 0.2s ease;
 }
 
@@ -905,12 +905,12 @@ textarea::placeholder {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   background: rgba(255, 255, 255, 0.08);
   color: #ffffff;
   border-radius: 50%;
-  font-size: 0.7rem;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
@@ -921,9 +921,9 @@ textarea::placeholder {
 .source-match {
   background: rgba(16, 157, 115, 0.1);
   color: var(--primary);
-  padding: 2px 6px;
-  border-radius: 6px;
-  font-size: 0.66rem;
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.6rem;
   font-weight: 700;
 }
 
@@ -1059,6 +1059,130 @@ textarea::placeholder {
   border-color: rgba(16, 157, 115, 0.1);
   color: #ffffff;
   border-left: 3px solid var(--primary);
+}
+
+/* ── Custom Dialog Modal ── */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65); /* Semi-transparent overlay */
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 3000; /* above everything */
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.modal-overlay.hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.modal-card {
+  width: 90%;
+  max-width: 420px;
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  animation: modalScaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalScaleUp {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.modal-header {
+  padding: 20px 20px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.modal-header h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.modal-close-btn {
+  background: none;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.modal-close-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.modal-body {
+  padding: 16px 20px 20px;
+}
+
+.modal-body p {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.modal-footer {
+  padding: 12px 20px 20px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.btn-modal-secondary {
+  padding: 8px 16px;
+  background: transparent;
+  color: #ececf1;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: #565656;
+}
+
+.btn-modal-danger {
+  padding: 8px 16px;
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-modal-danger:hover {
+  background: #dc2626;
 }
 
 /* Responsive adjustments */

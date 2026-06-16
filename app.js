@@ -304,20 +304,38 @@ document.addEventListener("click", (e) => {
 
 // ── Clear chat ──
 
-clearBtn.addEventListener("click", async () => {
-  if (confirm("Are you sure you want to clear your chat history?")) {
-    try {
-      await fetch(proxyUrl(settings.apiUrl + "/chat/clear"), {
-        method: "POST",
-        credentials: "include"
-      });
-    } catch (err) {
-      console.error("Failed to clear chat on server:", err);
-    }
-    chatHistory = [];
-    botResourcesMap.clear();
-    resetWelcome();
+const confirmModal = document.getElementById("confirm-modal");
+const confirmCancelBtn = document.getElementById("confirm-cancel-btn");
+const confirmCancelX = document.getElementById("confirm-cancel-x");
+const confirmClearBtn = document.getElementById("confirm-clear-btn");
+
+clearBtn.addEventListener("click", () => {
+  confirmModal.classList.remove("hidden");
+});
+
+function hideConfirmModal() {
+  confirmModal.classList.add("hidden");
+}
+
+confirmCancelBtn.addEventListener("click", hideConfirmModal);
+confirmCancelX.addEventListener("click", hideConfirmModal);
+confirmModal.addEventListener("click", (e) => {
+  if (e.target === confirmModal) hideConfirmModal();
+});
+
+confirmClearBtn.addEventListener("click", async () => {
+  hideConfirmModal();
+  try {
+    await fetch(proxyUrl(settings.apiUrl + "/chat/clear"), {
+      method: "POST",
+      credentials: "include"
+    });
+  } catch (err) {
+    console.error("Failed to clear chat on server:", err);
   }
+  chatHistory = [];
+  botResourcesMap.clear();
+  resetWelcome();
 });
 
 function resetWelcome() {
@@ -379,14 +397,14 @@ function addBotMessage(text, userMessage, resources = []) {
     sourcesHtml = `
       <div class="sources-list">
         <span class="sources-title">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           Sources:
         </span>
         ${resources.map((res, index) => {
           const scoreVal = typeof res.score === 'number'
             ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
             : 100;
-          return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
+          return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
         }).join("")}
       </div>
     `;
@@ -489,14 +507,14 @@ function renderSourcesList(container, resources) {
   if (!resources || resources.length === 0) return;
   container.innerHTML = `
     <span class="sources-title">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
       Sources:
     </span>
     ${resources.map((res, index) => {
       const scoreVal = typeof res.score === 'number'
         ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
         : 100;
-      return `<button class="source-chip" data-idx="${index}"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
+      return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
     }).join("")}
   `;
   container.style.display = "flex";
@@ -875,6 +893,7 @@ docPanelClose.addEventListener("click", closeDocPanel);
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeDocPanel();
+    hideConfirmModal();
   }
 });
 

@@ -16,6 +16,8 @@ def setup_auth(monkeypatch):
     db_path = Path(temp_dir) / "test_api.sqlite3"
 
     monkeypatch.setattr("src.app.config.TURSO_DATABASE_URL", None)
+    monkeypatch.setattr("src.app.config.SESSION_COOKIE_SECURE", False)
+    monkeypatch.setattr("src.app.config.SESSION_COOKIE_SAMESITE", "lax")
     monkeypatch.setattr("src.app.DB_PATH", db_path)
 
     from src.app import _init_chat_db

@@ -82,6 +82,21 @@ class Config:
     TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
     TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
 
+    # Determine secure cookie settings for cross-origin production environments
+    import sys
+    _is_testing = "pytest" in sys.modules or any("pytest" in arg for arg in sys.argv)
+
+    if _is_testing:
+        SESSION_COOKIE_SECURE = False
+    else:
+        _cookie_secure_env = os.getenv("SESSION_COOKIE_SECURE")
+        if _cookie_secure_env is not None:
+            SESSION_COOKIE_SECURE = _cookie_secure_env.lower() in ("true", "1", "yes")
+        else:
+            SESSION_COOKIE_SECURE = bool(TURSO_DATABASE_URL)
+
+    SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "none" if SESSION_COOKIE_SECURE else "lax")
+
 
 # Expose a singleton instance
 config = Config()

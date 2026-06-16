@@ -234,6 +234,8 @@ HF_ARTIFACTS_REPO=mazen248/sanad-ai-artifacts
 
 # User Workspace Sessions
 SESSION_SECRET_KEY=your_secure_random_session_secret_here
+SESSION_COOKIE_SECURE=False
+SESSION_COOKIE_SAMESITE=lax
 
 # Qdrant Database Settings
 QDRANT_URL=

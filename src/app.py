@@ -244,15 +244,22 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+is_production = bool(config.TURSO_DATABASE_URL)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.github\.io)(:\d+)?",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-app.add_middleware(SessionMiddleware, secret_key=config.SESSION_SECRET_KEY)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=config.SESSION_SECRET_KEY,
+    same_site=config.SESSION_COOKIE_SAMESITE,
+    https_only=config.SESSION_COOKIE_SECURE,
+)
 
 # Global RAG Instance
 rag: MentalHealthRAG | None = None

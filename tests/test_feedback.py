@@ -23,6 +23,12 @@ class TestFeedback(unittest.TestCase):
         self.config_patcher = patch("src.app.config.TURSO_DATABASE_URL", None)
         self.config_patcher.start()
 
+        self.cookie_secure_patcher = patch("src.app.config.SESSION_COOKIE_SECURE", False)
+        self.cookie_secure_patcher.start()
+
+        self.cookie_samesite_patcher = patch("src.app.config.SESSION_COOKIE_SAMESITE", "lax")
+        self.cookie_samesite_patcher.start()
+
         # Initialize the test DB schema
         from src.app import _init_chat_db
 
@@ -58,6 +64,8 @@ class TestFeedback(unittest.TestCase):
 
         self.db_patcher.stop()
         self.config_patcher.stop()
+        self.cookie_secure_patcher.stop()
+        self.cookie_samesite_patcher.stop()
 
         # Clean up temp database directory
         try:

@@ -459,4 +459,65 @@ You can view the full overfit analysis logs, heatmap comparisons, and radar diag
 
 You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part2.ipynb) files.
 
+---
 
+## 📊 Monitoring & Observability (MLOps)
+
+This application is instrumented with **OpenTelemetry** for robust business and system metrics tracking.
+Metrics and traces are securely exported to **HyperDX** using the OTLP protocol.
+
+### Custom Business Metrics Captured:
+1. `serenity.intent.count`: Tracks classified intents (e.g., greeting, crisis, out_of_scope).
+2. `serenity.message.length`: Tracks the distribution of message lengths for prompt injection or bot abuse detection.
+3. `serenity.http.requests`: Analyzes API endpoint usage and response status codes.
+4. `serenity.feedback.votes`: Monitors the thumbs-up/thumbs-down ratio for continuous RLHF improvement.
+
+### System Monitoring
+Using `opentelemetry-instrumentation-system` and `FastAPIInstrumentor`, we automatically monitor container CPU, Memory allocation, and FastAPI request latency distributions.
+
+---
+
+## 🧪 Load Testing (Locust)
+
+We utilize **Locust** for simulating concurrent user traffic to identify API bottlenecks.
+
+**To run the load test:**
+```bash
+# Run with the web UI
+uv run locust -f locustfile.py
+
+# Or run headless (e.g., 50 users, spawn rate of 5/sec, for 1 minute)
+uv run locust -f locustfile.py --headless -u 50 -r 5 --run-time 1m --host http://localhost:8000
+```
+
+---
+
+## 🔬 Model Comparison Table
+
+We evaluated several Large Language Models on a set of standardized counseling queries. The comparison analyzes average inference latency, an aggregated clinical empathy score (1-5), and relevance.
+
+| Model | Provider | Avg Latency | Empathy Score | Relevance Score | Cost (API) |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **GPT-OSS-20B** | Groq | ~2.1s | 4.2 | 4.0 | Free Tier |
+| **LLaMA-3-70B** | Groq | ~3.5s | 4.5 | 4.3 | Free Tier |
+| **Gemma-2-9B** | Groq | ~1.2s | 3.8 | 3.5 | Free Tier |
+| **Mixtral-8x7B**| Groq | ~2.8s | 4.1 | 4.1 | Free Tier |
+
+> Note: We selected **GPT-OSS-20B** for our baseline as it provided the optimal balance of inference speed and emotional attunement.
+
+---
+
+## 🌐 Deployed API (AWS)
+
+- **Backend API**: `https://sanad-ai.myvnc.com`
+- **Swagger Docs**: `https://sanad-ai.myvnc.com/docs`
+- **Frontend**: `https://mazen149.github.io/Mental-Health-RAG-Chatbot/`
+
+---
+
+## 👥 Team Members
+
+This project was built and is maintained by:
+1. **Ahmed Ashraf Abdulwahab Saleem**
+2. **Mazen Mohamed Montaset Elsay**
+3. **Peter Hany Fayez**

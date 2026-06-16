@@ -132,16 +132,47 @@ function addMessage(role, text) {
 }
 
 let messageId = 0;
+const botResourcesMap = new Map();
 
-function addBotMessage(text, userMessage) {
+function addBotMessage(text, userMessage, resources = []) {
   const id = ++messageId;
+  if (resources && resources.length > 0) {
+    botResourcesMap.set(id, resources);
+  }
   const div = document.createElement("div");
   div.className = "message bot";
+  div.dataset.id = id;
+
+  let htmlContent = marked.parse(text);
+  // Replace citations [1], [2], etc. with custom interactive buttons
+  htmlContent = htmlContent.replace(/\[([0-9]+)\]/g, (match, num) => {
+    const idx = parseInt(num) - 1;
+    return `<button class="citation-btn" data-idx="${idx}">[${num}]</button>`;
+  });
+
+  let sourcesHtml = "";
+  if (resources && resources.length > 0) {
+    sourcesHtml = `
+      <div class="sources-list">
+        <span class="sources-title">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          Sources:
+        </span>
+        ${resources.map((res, index) => {
+          const scoreVal = typeof res.score === 'number'
+            ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
+            : 100;
+          return `<button class="source-chip" data-idx="${index}">[${index + 1}] Match ${scoreVal}%</button>`;
+        }).join("")}
+      </div>
+    `;
+  }
 
   div.innerHTML = `
     <div class="avatar">S</div>
     <div class="bubble-wrap">
-      <div class="bubble markdown">${marked.parse(text)}</div>
+      <div class="bubble markdown">${htmlContent}</div>
+      ${sourcesHtml}
       <div class="feedback-btns" data-id="${id}">
         <button class="fb-btn" data-vote="up" title="Helpful">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>
@@ -255,8 +286,9 @@ async function send() {
 
     const reply =
       data.response || data.answer || data.message || data.reply || data.text;
+    const resources = data.resources || [];
 
-    addBotMessage(reply || JSON.stringify(data, null, 2), text);
+    addBotMessage(reply || JSON.stringify(data, null, 2), text, resources);
   } catch (err) {
     hideTyping();
     if (err.name === "TypeError" && err.message === "Failed to fetch") {
@@ -268,3 +300,60 @@ async function send() {
     }
   }
 }
+
+// ── Retrieval Document Drawer Logic ──
+const docPanel = document.getElementById("doc-panel");
+const docPanelOverlay = document.getElementById("doc-panel-overlay");
+const docPanelClose = document.getElementById("doc-panel-close");
+const docPanelTitle = document.getElementById("doc-panel-title");
+const docPanelScoreValue = document.getElementById("doc-panel-score-value");
+const docPanelContext = document.getElementById("doc-panel-context");
+const docPanelAdvice = document.getElementById("doc-panel-advice");
+
+function showDocumentDetails(num, resource) {
+  docPanelTitle.textContent = `Retrieved Source [${num}]`;
+
+  // Format score as percentage if it's less than or equal to 1, or keep as is.
+  const scoreVal = typeof resource.score === 'number'
+    ? (resource.score <= 1.0 ? Math.round(resource.score * 100) : Math.round(resource.score))
+    : 100;
+  docPanelScoreValue.textContent = `${scoreVal}% Relevance Match`;
+
+  docPanelContext.textContent = resource.page_content || "No context provided.";
+  docPanelAdvice.textContent = resource.response || "No advice provided.";
+
+  docPanel.classList.add("open");
+}
+
+function closeDocPanel() {
+  docPanel.classList.remove("open");
+}
+
+docPanelOverlay.addEventListener("click", closeDocPanel);
+docPanelClose.addEventListener("click", closeDocPanel);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeDocPanel();
+  }
+});
+
+// Event delegation for citation clicks and source menu chip clicks in the chat area
+chatArea.addEventListener("click", (e) => {
+  const btn = e.target.closest(".citation-btn, .source-chip");
+  if (!btn) return;
+
+  const msgDiv = btn.closest(".message.bot");
+  if (!msgDiv) return;
+
+  const msgId = parseInt(msgDiv.dataset.id);
+  const resources = botResourcesMap.get(msgId);
+  if (!resources) return;
+
+  const docIdx = parseInt(btn.dataset.idx);
+  const resource = resources[docIdx];
+  if (resource) {
+    showDocumentDetails(docIdx + 1, resource);
+  }
+});
+

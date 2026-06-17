@@ -11,9 +11,9 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [backend-mazen]
+    branches: [backend]
   pull_request:
-    branches: [backend-mazen]
+    branches: [backend]
 
 env:
   DOCKER_IMAGE: mazen1393/sanad-ai-backend
@@ -53,7 +53,7 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/backend-mazen'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/backend'
 
     steps:
       - name: Checkout code
@@ -88,7 +88,7 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/backend-mazen'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/backend'
 
     steps:
       - name: Deploy via SSH

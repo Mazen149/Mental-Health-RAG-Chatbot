@@ -358,7 +358,7 @@ The infrastructure is modularized into three separate components:
    * Open Ingress Ports: **22** (SSH for CI/CD updates) and **8000** (FastAPI HTTP web traffic).
    * Egress: Allows all outbound traffic for dynamic ML artifact downloading from Hugging Face.
 3. **Compute Module (`terraform/modules/compute`)**:
-   * Provisions an **EC2 `t3.micro`** instance (running Amazon Linux 2023).
+   * Provisions an **EC2 `t3.small`** instance (running Amazon Linux 2023).
    * Installs **Docker** and registers the container as a system service.
    * Creates and mounts a **2 GB Swap File** (this allows the backend to handle ONNX model extraction and first-time Hugging Face downloads on standard free-tier/low-memory RAM configurations without getting out-of-memory killed).
 

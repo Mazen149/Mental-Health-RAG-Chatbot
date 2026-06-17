@@ -162,7 +162,7 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.grounded_module.assert_called_once()
 
     def test_query_clears_resources_on_fallback_message(self):
-        """Verify that resources are cleared when the response is the insufficient information fallback message."""
+        """Verify that resources are cleared when the response is the insufficient information fallback message or token limit message."""
         mock_doc = Document(
             page_content="Mock question", metadata={"response": "Mock answer"}
         )
@@ -180,6 +180,12 @@ class TestMentalHealthRAG(unittest.TestCase):
         self.rag.grounded_module = MagicMock(return_value="I’m sorry, I don’t have enough information to answer that.")
         output = self.rag.query("some query")
         self.assertEqual(output["answer"], "I’m sorry, I don’t have enough information to answer that.")
+        self.assertEqual(output["resources"], [])
+
+        # Test with token limit message
+        self.rag.grounded_module = MagicMock(return_value="The token limit has been reached. Please wait a moment before trying again.")
+        output = self.rag.query("some query")
+        self.assertEqual(output["answer"], "The token limit has been reached. Please wait a moment before trying again.")
         self.assertEqual(output["resources"], [])
 
 

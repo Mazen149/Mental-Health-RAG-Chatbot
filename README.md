@@ -145,7 +145,6 @@ Mental-Health-RAG-Chatbot/
 ├── pyproject.toml                    # Hatchling project dependencies and tool configs
 ├── uv.lock                           # Lockfile for reproducible environment state
 ├── main.py                           # Server startup entry point
-├── team_members.txt                  # Contributors list
 ├── README.md                         # Project documentation
 │
 ├── .github/                          # CI/CD Workflows
@@ -211,8 +210,7 @@ Mental-Health-RAG-Chatbot/
 │   │   └── pipeline_results.png
 │   └── emotion_classification/       # Emotion adapter training logs and distribution plots
 │       ├── confusion_matrix.png
-│       ├── eda_distribution.png
-│       └── Screenshot 2026-05-27 234434.png
+│       └── eda_distribution.png
 │
 └── artifacts/                        # Serialized models, sqlite database, and prompt weights
     ├── chat_interactions.sqlite3     # SQLite DB storing user details & historical chat records
@@ -337,7 +335,7 @@ uv run pytest
 The application is deployed on a cost-effective, cloud-ready AWS infrastructure provisioned using **Terraform (modularized)** and fully automated using a **GitHub Actions CI/CD pipeline**.
 
 <p align="center">
-  <img src="Cloud infrastructure and CI-CD pipeline diagram.png" alt="Cloud Infrastructure and CI-CD Pipeline Diagram" width="900"/>
+  <img src="assets/Cloud infrastructure and CI-CD pipeline diagram.png" alt="Cloud Infrastructure and CI-CD Pipeline Diagram" width="900"/>
 </p>
 
 ### 🏗️ Infrastructure Architecture (Terraform)
@@ -560,7 +558,7 @@ The dashboard in Axiom visualises all three metric categories with the following
 **Screenshot of the Axiom dashboard:**
 
 <p align="center">
-  <img src="metrics/axiom_dashboard.png" alt="Axiom Monitoring Dashboard" width="900"/>
+  <img src="assets/Axiom results.jpeg" alt="Axiom Monitoring Dashboard" width="900"/>
 </p>
 
 > 📌 To recreate the dashboard: In Axiom, create a new dashboard, add a **Time series** chart per metric listed above using APL queries such as:

@@ -850,9 +850,12 @@ class MentalHealthRAG:
         # Safeguard: Apply medical disclaimer check
         answer = check_medical_advice(answer, language)
 
-        # Clear sources/resources if the answer is the insufficient information fallback message
+        # Clear sources/resources if the answer is the insufficient information fallback message or the token limit message
         normalized_answer = answer.strip().replace("’", "'").replace("‘", "'").rstrip(".")
-        if normalized_answer.lower() == "i'm sorry, i don't have enough information to answer that":
+        if normalized_answer.lower() in (
+            "i'm sorry, i don't have enough information to answer that",
+            "the token limit has been reached. please wait a moment before trying again"
+        ):
             resources = []
 
         return {"answer": answer, "resources": resources}

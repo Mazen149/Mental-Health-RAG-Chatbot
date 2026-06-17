@@ -5,6 +5,7 @@ __pycache__/
 data/
 axiom_test.py
 otel-collector-config.yaml
+chat_interactions.sqlite3
 # C extensions
 *.so
 

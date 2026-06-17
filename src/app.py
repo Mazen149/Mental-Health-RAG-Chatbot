@@ -26,95 +26,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 import logging
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
 # ------------------------------------------------------------------------------
-# OpenTelemetry & HyperDX Configuration
-# ------------------------------------------------------------------------------
-from opentelemetry import metrics
-from opentelemetry.sdk.metrics import MeterProvider
-from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-
-hyperdx_api_key = os.getenv("HYPERDX_API_KEY", "")
-
-_resource = Resource.create({
-    "service.name": "serenity-api",
-    "service.version": "1.0.0",
-})
-
-if hyperdx_api_key:
-    # Use HyperDX OTLP endpoint
-    _metric_exporter = OTLPMetricExporter(
-        endpoint="https://in.hyperdx.io/v1/metrics",
-        headers={"Authorization": hyperdx_api_key}
-    )
-    _span_exporter = OTLPSpanExporter(
-        endpoint="https://in.hyperdx.io/v1/traces",
-        headers={"Authorization": hyperdx_api_key}
-    )
-else:
-    # Fallback to local collector
-    _otel_endpoint_metrics = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/metrics")
-    _otel_endpoint_traces = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4318/v1/traces")
-    _metric_exporter = OTLPMetricExporter(endpoint=_otel_endpoint_metrics)
-    _span_exporter = OTLPSpanExporter(endpoint=_otel_endpoint_traces)
-
-# Set up Metrics
-_metric_reader = PeriodicExportingMetricReader(_metric_exporter, export_interval_millis=15000)
-_meter_provider = MeterProvider(resource=_resource, metric_readers=[_metric_reader])
-metrics.set_meter_provider(_meter_provider)
-
-# Set up Traces (Spans)
-_tracer_provider = TracerProvider(resource=_resource)
-_tracer_provider.add_span_processor(BatchSpanProcessor(_span_exporter))
-trace.set_tracer_provider(_tracer_provider)
-
-# Create a Meter
-meter = metrics.get_meter("serenity_meter", version="1.0.0")
-
-intent_counter = meter.create_counter(
-    name="serenity.intent.count",
-    description="Count of classified intents",
-    unit="1",
-)
-
-message_length_histogram = meter.create_histogram(
-    name="serenity.message.length",
-    description="Character length of user messages",
-    unit="characters",
-)
-
-http_request_counter = meter.create_counter(
-    name="serenity.http.requests",
-    description="Count of HTTP requests by endpoint and status",
-    unit="1",
-)
-
-feedback_counter = meter.create_counter(
-    name="serenity.feedback.votes",
-    description="Count of user feedback votes",
-    unit="1",
-)
-
-# Start System Metrics (CPU/RAM) Collection
-SystemMetricsInstrumentor().instrument()
-
-# ------------------------------------------------------------------------------
 # 1. Environment Loading & Configuration
 # ------------------------------------------------------------------------------
 from .config import config
-from . import metrics
+from . import metrics  # unified OTel metrics module — initialised at startup
 
 # Local project imports (must load after environment resolution)
 from .modules.rag import MentalHealthRAG
@@ -326,16 +252,14 @@ app = FastAPI(
 
 is_production = bool(config.TURSO_DATABASE_URL)
 
-FastAPIInstrumentor.instrument_app(app)
-
 @app.middleware("http")
 async def track_requests(request: Request, call_next):
     response = await call_next(request)
-    http_request_counter.add(1, {
-        "method": request.method,
-        "endpoint": request.url.path,
-        "status_code": str(response.status_code),
-    })
+    metrics.record_http_request(
+        method=request.method,
+        endpoint=request.url.path,
+        status_code=str(response.status_code),
+    )
     return response
 
 app.add_middleware(
@@ -733,10 +657,18 @@ def _sse_event(event: str, data: Any) -> str:
 @app.on_event("startup")
 async def startup_event() -> None:
     """Runs concurrent startup model loading routines."""
-    # Initialize metrics (OpenTelemetry)
+    # Initialize metrics (OpenTelemetry → OTel Collector → Axiom)
     try:
         metrics.init_metrics()
         print("--> [Metrics] OpenTelemetry metrics initialized.")
+        # SystemMetricsInstrumentor must be called *after* the MeterProvider
+        # is registered so it attaches to the correct provider.
+        try:
+            from opentelemetry.instrumentation.system_metrics import SystemMetricsInstrumentor
+            SystemMetricsInstrumentor().instrument()
+            print("--> [Metrics] System metrics (CPU/RAM) instrumented.")
+        except Exception as se:
+            print(f"--> [Metrics] System metrics instrumentation skipped: {se}")
     except Exception as e:
         print(f"--> [Metrics] Failed to initialize metrics: {e}")
 
@@ -873,10 +805,10 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         resources=result.get("resources", []),
     )
 
-    # Record OTel metrics
-    message_length_histogram.record(len(query_text))
-    if result and "intent" in result:
-        intent_counter.add(1, {"intent": result.get("intent", "unknown")})
+    # Record OTel metrics via the unified metrics module
+    metrics.record_chat_request()
+    if result and result.get("intent"):
+        metrics.record_intent(result["intent"])
 
     return ChatResponse(
         answer=result["answer"],
@@ -903,9 +835,28 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
     if rag is None:
         raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
 
+    # Metrics: increment request and record message length
     try:
-        result = await route_query(query_text, rag, history=request.history)
+        metrics.record_request()
+        metrics.record_message_length(len(query_text))
     except Exception:
+        pass
+
+    result = None
+    try:
+        import time
+        start = time.time()
+        result = await route_query(query_text, rag, history=request.history)
+        elapsed_ms = (time.time() - start) * 1000.0
+        try:
+            metrics.record_response_latency(elapsed_ms)
+        except Exception:
+            pass
+    except Exception:
+        try:
+            metrics.record_error()
+        except Exception:
+            pass
         result = {"answer": "Failed to generate a response.", "resources": []}
 
     answer = str(result.get("answer", "")).strip() or "Failed to generate a response."
@@ -920,6 +871,11 @@ async def chat_stream(page_request: Request, request: ChatRequest) -> StreamingR
         intent=result.get("intent"),
         resources=resources,
     )
+
+    # Record OTel metrics via the unified metrics module
+    metrics.record_chat_request()
+    if result and result.get("intent"):
+        metrics.record_intent(result["intent"])
 
     async def event_generator():
         yield _sse_event(

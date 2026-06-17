@@ -2,8 +2,11 @@
 # SANAD AI — Docker Compose (Production)
 # =============================================================================
 # Services:
-#   - backend  : FastAPI (uvicorn) on port 8000
-#   - frontend : Nginx serving the SPA on port 80 → exposed as 3000
+#   - libsql        : Local LibSQL (SQLite-compatible) database
+#   - otel-collector: OpenTelemetry Collector — receives OTLP from backend,
+#                     forwards metrics/traces/logs to Axiom
+#   - backend       : FastAPI (uvicorn) on port 8000
+#   - frontend      : Nginx serving the SPA on port 80 → exposed as 3000
 #
 # Usage:
 #   docker compose up -d
@@ -33,6 +36,50 @@ services:
       - sanad-network
 
   # ---------------------------------------------------------------------------
+  # OpenTelemetry Collector
+  # Receives OTLP signals from the backend (port 4318 HTTP / 4317 gRPC)
+  # and forwards them authenticated to Axiom.
+  # ---------------------------------------------------------------------------
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: sanad-otel-collector
+    restart: unless-stopped
+
+    command: ["--config=/etc/otelcol/otel-collector-config.yaml"]
+
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol/otel-collector-config.yaml:ro
+
+    ports:
+      - "4317:4317"   # gRPC OTLP receiver
+      - "4318:4318"   # HTTP OTLP receiver
+      - "8888:8888"   # Prometheus metrics exposed by the collector itself
+
+    environment:
+      - AXIOM_API_TOKEN=${AXIOM_API_TOKEN}
+      - AXIOM_METRICS_DATASET=${AXIOM_METRICS_DATASET:-nlp-project}
+
+    networks:
+      - sanad-network
+
+    depends_on:
+      libsql:
+        condition: service_started
+
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:13133/"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ---------------------------------------------------------------------------
   # Backend — FastAPI + RAG pipeline
   # ---------------------------------------------------------------------------
   backend:
@@ -47,11 +94,14 @@ services:
       - .env # All secrets & model config (see .env.example)
 
     environment:
-      - PYTHONUNBUFFERED=1 # Ensure real-time log output
+      - PYTHONUNBUFFERED=1                       # Ensure real-time log output
       - TURSO_DATABASE_URL=http://libsql:8080
       - TURSO_AUTH_TOKEN=
       - QDRANT_URL=
       - QDRANT_API_KEY=
+      # OTel: send to the collector container (not directly to Axiom)
+      - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://otel-collector:4318/v1/metrics
+      - OTEL_METRIC_EXPORT_INTERVAL_MS=15000
 
     volumes:
       - backend-artifacts:/app/artifacts # Persist downloaded HF models
@@ -62,6 +112,8 @@ services:
 
     depends_on:
       libsql:
+        condition: service_started
+      otel-collector:
         condition: service_started
 
     healthcheck:

@@ -30,17 +30,10 @@
 
 **Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support.
 
-## 📊 Monitoring & Metrics
+## 📊 Monitoring & Observability
 
-This project instruments the API with OpenTelemetry (OTLP -> Axiom or any OTLP endpoint) and records three metric categories:
-
-- Model/NLP: rag.retrieval.score & server.response.latency_ms — tracks retrieval quality and model/RAG latency to detect degradation or regressions.
-- Data: chat.message.length & feedback.votes — monitors input size distribution and user feedback (up/down) to catch UX problems or data drift.
-- Server: server.request.count, server.error.count, server.uptime_seconds — basic service health, load, and error-rate monitoring.
-
-Configure metrics via OTEL_EXPORTER_OTLP_METRICS_ENDPOINT or AXIOM_OTLP_METRICS_ENDPOINT and set AXIOM_API_TOKEN / AXIOM_ACCESS_TOKEN for authentication.
-
-The application features secure user workspaces (authentication and persistent chat histories via a local SQLite database), real-time speech-to-text audio streaming with client-side voice silence detection, multilingual routing, emotion tone adaptors, cross-encoder reranking, and a compiled DSPy instruction-tuning harness optimized via the GEPA compiler.
+This project uses **OpenTelemetry** (OTLP) → **OTel Collector** → **Axiom** for full metrics observability.
+See the [Monitoring & Observability](#-monitoring--observability-mlops) section below for full details, metric rationale, and the Axiom dashboard screenshot.
 
 ---
 
@@ -473,17 +466,109 @@ You can inspect the evaluation run details, validation logs, and prompt comparis
 
 ## 📊 Monitoring & Observability (MLOps)
 
-This application is instrumented with **OpenTelemetry** for robust business and system metrics tracking.
-Metrics and traces are securely exported to **HyperDX** using the OTLP protocol.
+Sanad AI is instrumented with **OpenTelemetry (OTLP)** and exports all signals through an **OpenTelemetry Collector** to **Axiom** for real-time dashboarding. Three metric categories are tracked:
 
-### Custom Business Metrics Captured:
-1. `serenity.intent.count`: Tracks classified intents (e.g., greeting, crisis, out_of_scope).
-2. `serenity.message.length`: Tracks the distribution of message lengths for prompt injection or bot abuse detection.
-3. `serenity.http.requests`: Analyzes API endpoint usage and response status codes.
-4. `serenity.feedback.votes`: Monitors the thumbs-up/thumbs-down ratio for continuous RLHF improvement.
+### Architecture
 
-### System Monitoring
-Using `opentelemetry-instrumentation-system` and `FastAPIInstrumentor`, we automatically monitor container CPU, Memory allocation, and FastAPI request latency distributions.
+```
+FastAPI Backend
+    │  OTLP/HTTP (port 4318)
+    ▼
+OTel Collector (otel/opentelemetry-collector-contrib)
+    │  OTLP/HTTP + Bearer token + X-Axiom-Dataset header
+    ▼
+Axiom  ──►  Dashboard (metrics / traces / logs)
+```
+
+---
+
+### Metric 1 — NLP / Model: `sanad.rag.response_latency_ms`, `sanad.rag.retrieval_score`, `sanad.intent.count`
+
+| Instrument | Type | Labels |
+|---|---|---|
+| `sanad.rag.response_latency_ms` | Histogram | — |
+| `sanad.rag.retrieval_score` | Histogram | — |
+| `sanad.intent.count` | Counter | `intent` |
+
+**Rationale:** The RAG pipeline is the core of this product. Tracking end-to-end latency (intent classification + hybrid retrieval + LLM generation) lets us detect slow retrievals, embedding-model regressions, or Groq API degradation before users notice. Retrieval score distribution signals embedding drift or dataset staleness — a sustained drop in scores means we need to re-index the Qdrant collection. Intent distribution reveals usage patterns (e.g. spike in `crisis` intents) that may require human review.
+
+---
+
+### Metric 2 — Data: `sanad.chat.message_length`, `sanad.feedback.votes`
+
+| Instrument | Type | Labels |
+|---|---|---|
+| `sanad.chat.message_length` | Histogram | — |
+| `sanad.feedback.votes` | Counter | `vote` (up / down) |
+
+**Rationale:** Message length distribution is a first-line detector for prompt injection (very long inputs) and automated scraping (unusually short pings). Feedback vote ratio (👍 vs 👎) is the primary continuous quality signal — a worsening thumbs-down rate triggers a model or retrieval review. Both metrics feed directly into future RLHF fine-tuning pipelines.
+
+---
+
+### Metric 3 — Server: `sanad.server.request_count`, `sanad.server.error_count`, `sanad.server.uptime_seconds`, `sanad.http.requests`
+
+| Instrument | Type | Labels |
+|---|---|---|
+| `sanad.server.request_count` | Counter | — |
+| `sanad.server.error_count` | Counter | — |
+| `sanad.http.requests` | Counter | `method`, `endpoint`, `status_code` |
+| `sanad.server.uptime_seconds` | Observable Gauge | — |
+
+**Rationale:** Request count and error rate give an immediate SLA view — error rate (errors / requests) going above 1% triggers an alert. The per-endpoint, per-status-code breakdown identifies which routes produce the most 5xx responses. Uptime gauge drops to near-zero after a container restart, making crash loops immediately visible on the Axiom dashboard.
+
+---
+
+### Running the Full Observability Stack
+
+```powershell
+# 1. Set secrets in your .env
+#    AXIOM_API_TOKEN=xaat-...
+#    AXIOM_METRICS_DATASET=nlp-project
+
+# 2. Start all services (includes otel-collector automatically)
+docker compose up -d
+
+# 3. Confirm the collector is forwarding
+docker compose logs otel-collector
+
+# 4. Open Axiom → your dataset → Stream view to see incoming events
+```
+
+For **local development** (without Docker), you can send metrics directly to Axiom by setting:
+
+```env
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://api.axiom.co/v1/metrics
+AXIOM_API_TOKEN=xaat-...
+AXIOM_METRICS_DATASET=nlp-project
+```
+
+### Axiom Dashboard
+
+The dashboard in Axiom visualises all three metric categories with the following panels:
+
+| Panel | Metric | Visualization |
+|---|---|---|
+| RAG Latency (p50 / p95 / p99) | `sanad.rag.response_latency_ms` | Time-series line chart |
+| Retrieval Score Distribution | `sanad.rag.retrieval_score` | Histogram |
+| Intent Distribution | `sanad.intent.count` | Pie / bar chart by `intent` label |
+| Message Length Distribution | `sanad.chat.message_length` | Histogram |
+| Feedback Vote Ratio | `sanad.feedback.votes` | Stacked bar by `vote` label |
+| Request Rate & Error Rate | `sanad.server.request_count`, `sanad.server.error_count` | Time-series + ratio |
+| HTTP Requests by Endpoint | `sanad.http.requests` | Table grouped by `endpoint` + `status_code` |
+| Server Uptime | `sanad.server.uptime_seconds` | Single stat |
+
+**Screenshot of the Axiom dashboard:**
+
+<p align="center">
+  <img src="metrics/axiom_dashboard.png" alt="Axiom Monitoring Dashboard" width="900"/>
+</p>
+
+> 📌 To recreate the dashboard: In Axiom, create a new dashboard, add a **Time series** chart per metric listed above using APL queries such as:
+> ```
+> ['nlp-project']
+> | where ['_metric'] == 'sanad.rag.response_latency_ms'
+> | summarize p95 = percentile(['_value'], 95) by bin_auto(_time)
+> ```
 
 ---
 

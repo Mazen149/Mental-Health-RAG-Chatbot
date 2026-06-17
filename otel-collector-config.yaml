@@ -1,37 +1,84 @@
-# OpenTelemetry Collector Configuration
-# Receives metrics from the Serenity API and forwards them to Axiom
+# =============================================================================
+# OpenTelemetry Collector Configuration — Sanad AI
+# =============================================================================
+# Receives OTLP signals (metrics, traces, logs) from the FastAPI backend and
+# forwards them to Axiom via authenticated OTLP/HTTP.
+#
+# The backend always talks to the collector on localhost:4318 (HTTP).
+# The collector handles Axiom auth so the app needs no Axiom token at runtime.
+# =============================================================================
 
 receivers:
   otlp:
     protocols:
       grpc:
-        endpoint: 0.0.0.0:4317
+        endpoint: 0.0.0.0:4317   # gRPC OTLP receiver (not used by default)
       http:
-        endpoint: 0.0.0.0:4318
+        endpoint: 0.0.0.0:4318   # HTTP OTLP receiver — used by the FastAPI app
 
 processors:
+  # Limit memory consumption in case of bursts
+  memory_limiter:
+    check_interval: 5s
+    limit_mib: 256
+    spike_limit_mib: 64
+
+  # Batch export for efficiency
   batch:
     timeout: 10s
     send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Add a resource attribute so Axiom can filter by service
+  resource:
+    attributes:
+      - key: service.name
+        value: "sanad-ai-backend"
+        action: upsert
 
 exporters:
-  otlphttp:
+  # --------------------------------------------------------------------------
+  # Axiom OTLP/HTTP exporter
+  # Axiom docs: https://axiom.co/docs/send-data/opentelemetry
+  # --------------------------------------------------------------------------
+  otlphttp/axiom:
     endpoint: "https://api.axiom.co"
     headers:
       Authorization: "Bearer ${env:AXIOM_API_TOKEN}"
-      X-Axiom-Dataset: "${env:AXIOM_DATASET}"
+      # X-Axiom-Dataset routes all signals to the same Axiom dataset.
+      # Individual signal types (metrics / traces / logs) are separated
+      # inside Axiom using the _type field.
+      X-Axiom-Dataset: "${env:AXIOM_METRICS_DATASET}"
     compression: gzip
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
 
+  # Debug exporter — prints a summary of every batch to the collector stdout.
+  # Useful for confirming data is flowing without checking Axiom directly.
   debug:
     verbosity: basic
 
 service:
+  telemetry:
+    logs:
+      level: info
+
   pipelines:
     metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlphttp, debug]
+      receivers:  [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters:  [otlphttp/axiom, debug]
+
     traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [otlphttp, debug]
+      receivers:  [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters:  [otlphttp/axiom, debug]
+
+    logs:
+      receivers:  [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters:  [otlphttp/axiom, debug]

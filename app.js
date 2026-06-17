@@ -29,6 +29,16 @@ const recordingStatus = document.getElementById("recording-status");
 const recordingTimer = document.getElementById("recording-timer");
 const transcribingStatus = document.getElementById("transcribing-status");
 
+// Settings DOM references
+const settingsModal = document.getElementById("settings-modal");
+const settingsForm = document.getElementById("settings-form");
+const settingsApiUrlInput = document.getElementById("settings-api-url");
+const settingsChatEndpointInput = document.getElementById("settings-chat-endpoint");
+const settingsCancelBtn = document.getElementById("settings-cancel-btn");
+const headerSettingsBtn = document.getElementById("header-settings-btn");
+const loginSettingsBtn = document.getElementById("login-settings-btn");
+const registerSettingsBtn = document.getElementById("register-settings-btn");
+
 const STORAGE_KEY = "sanad_ai_settings";
 const defaults = {
   apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
@@ -902,6 +912,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     closeDocPanel();
     hideConfirmModal();
+    hideSettingsModal();
   }
 });
 
@@ -921,6 +932,45 @@ chatArea.addEventListener("click", (e) => {
   if (resource) {
     showDocumentDetails(docIdx + 1, resource);
   }
+});
+
+// ── Settings Modal Logic ──
+
+function showSettingsModal() {
+  settingsApiUrlInput.value = settings.apiUrl;
+  settingsChatEndpointInput.value = settings.endpoint;
+  settingsModal.classList.remove("hidden");
+}
+
+function hideSettingsModal() {
+  settingsModal.classList.add("hidden");
+}
+
+headerSettingsBtn.addEventListener("click", showSettingsModal);
+loginSettingsBtn.addEventListener("click", showSettingsModal);
+registerSettingsBtn.addEventListener("click", showSettingsModal);
+
+settingsCancelBtn.addEventListener("click", hideSettingsModal);
+settingsModal.addEventListener("click", (e) => {
+  if (e.target === settingsModal) hideSettingsModal();
+});
+
+settingsForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  
+  const apiUrlVal = settingsApiUrlInput.value.trim();
+  const endpointVal = settingsChatEndpointInput.value.trim();
+  
+  if (!apiUrlVal || !endpointVal) return;
+  
+  settings.apiUrl = apiUrlVal;
+  settings.endpoint = endpointVal;
+  
+  saveSettings(settings);
+  hideSettingsModal();
+  
+  // Re-verify authentication/connection with the new API URL
+  checkAuth();
 });
 
 // ── Initialize App ──

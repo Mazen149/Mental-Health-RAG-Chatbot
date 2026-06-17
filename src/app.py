@@ -752,17 +752,20 @@ async def startup_event() -> None:
 
     async def load_rag():
         global rag
-        rag = MentalHealthRAG()
-        documents = await asyncio.to_thread(rag.load_and_preprocess)
-        await asyncio.to_thread(rag.setup_retriever, documents)
+        _temp_rag = MentalHealthRAG()
+        documents = await asyncio.to_thread(_temp_rag.load_and_preprocess)
+        await asyncio.to_thread(_temp_rag.setup_retriever, documents)
+        rag = _temp_rag
         logger.info(
             "--> [RAG Setup] Vector store and retrievers preloaded successfully."
         )
 
     from .router import preload_models
 
-    # Preload RAG and classifier/translator models concurrently
-    await asyncio.gather(load_rag(), preload_models())
+    # Preload RAG and classifier/translator models concurrently as background tasks.
+    # This prevents the Azure health check from timing out while indexing vectors.
+    asyncio.create_task(load_rag())
+    asyncio.create_task(preload_models())
 
 
 @app.on_event("shutdown")
@@ -822,7 +825,7 @@ async def chat(page_request: Request, request: ChatRequest) -> ChatResponse:
         raise HTTPException(status_code=400, detail="Query text is required.")
 
     if rag is None:
-        raise HTTPException(status_code=503, detail="RAG engine is not initialized.")
+        raise HTTPException(status_code=503, detail="RAG engine is initializing in the background. Please wait a few moments.")
 
     # Metrics: increment request and record message length
     try:

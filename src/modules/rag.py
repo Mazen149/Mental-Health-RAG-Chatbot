@@ -417,6 +417,7 @@ class MentalHealthRAG:
         self.model_name = config.GROQ_GENERATION_MODEL
         self.chunk_size = 500
         self.chunk_overlap = 100
+        self.max_contexts = 5
 
         # Initialize DSPy modules
         groq_api_key = config.GROQ_API_KEY
@@ -764,42 +765,10 @@ class MentalHealthRAG:
             for doc in selected_docs
         ]
 
-        context_blocks = []
-        for i, res in enumerate(resources, start=1):
-            question_part = ""
-            response_part = res["response"].strip()
-            page_content = res["page_content"].strip()
-            if "\n\n" in page_content:
-                question_part = page_content.split("\n\n", 1)[0].strip()
-            if not question_part:
-                question_part = "Unknown source question"
-            response_excerpt = " ".join(response_part.split()[:180])
-            context_blocks.append(
-                f"Context [{i}]\nSource question: {question_part}\nSource answer excerpt: {response_excerpt}"
-            )
-
-        top_context = "\n\n".join(context_blocks)
-        sys_prompt = system_prompt or (
-            "You are a compassionate mental health assistant. Answer using only the provided context. "
-            "If the context does not contain enough information, say you do not have enough information. "
-            "Cite the specific context number after each sentence that relies on it."
-        )
-
-        formatted_messages = [{"role": "system", "content": sys_prompt}]
-
-        resources = [
-            {
-                "score": doc.metadata.get("rerank_score", 0.0),
-                "page_content": doc.page_content,
-                "response": doc.metadata.get("response", ""),
-            }
-            for doc in reranked_docs[:5]
-        ]
-
         top_context = "\n\n".join(
             [
                 f"Context [{i+1}]: {res['response']}"
-                for i, res in enumerate(resources[:5])
+                for i, res in enumerate(resources)
             ]
         )
 

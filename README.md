@@ -570,6 +570,13 @@ The dashboard in Axiom visualises all three metric categories with the following
 > | summarize p95 = percentile(['_value'], 95) by bin_auto(_time)
 > ```
 
+### Live Dashboard (HyperDX)
+The dashboard accurately visualizes all custom metrics, system health, and OpenTelemetry trace data in real-time.
+
+<p align="center">
+  <img src="assets/hyperdx.png" alt="HyperDX Live Dashboard" width="850"/>
+</p>
+
 ---
 
 ## 🧪 Load Testing (Locust)
@@ -584,6 +591,15 @@ uv run locust -f locustfile.py
 # Or run headless (e.g., 50 users, spawn rate of 5/sec, for 1 minute)
 uv run locust -f locustfile.py --headless -u 50 -r 5 --run-time 1m --host http://localhost:8000
 ```
+
+### Load Testing Results
+Below are the results of simulating concurrent user traffic against the API endpoints:
+
+<p align="center">
+  <img src="assets/locust-0.png" alt="Locust Test Run" width="850"/>
+  <br>
+  <img src="assets/locust-1.png" alt="Locust Request Statistics" width="850"/>
+</p>
 
 ---
 

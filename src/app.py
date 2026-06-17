@@ -54,13 +54,13 @@ _resource = Resource.create({
 })
 
 if hyperdx_api_key:
-    # Use HyperDX OTLP endpoint
+    # Use HyperDX OTLP endpoint (must use in-otel subdomain for OpenTelemetry)
     _metric_exporter = OTLPMetricExporter(
-        endpoint="https://in.hyperdx.io/v1/metrics",
+        endpoint="https://in-otel.hyperdx.io/v1/metrics",
         headers={"Authorization": hyperdx_api_key}
     )
     _span_exporter = OTLPSpanExporter(
-        endpoint="https://in.hyperdx.io/v1/traces",
+        endpoint="https://in-otel.hyperdx.io/v1/traces",
         headers={"Authorization": hyperdx_api_key}
     )
 else:

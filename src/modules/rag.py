@@ -771,22 +771,22 @@ class MentalHealthRAG:
             if not reranked_docs:
                 return {"answer": "No relevant context found.", "resources": []}
 
-        selected_docs = reranked_docs[: self.max_contexts]
-        resources = [
-            {
-                "score": doc.metadata.get("rerank_score", 0.0),
-                "page_content": doc.page_content,
-                "response": doc.metadata.get("response", ""),
-            }
-            for doc in selected_docs
-        ]
-
-        top_context = "\n\n".join(
-            [
-                f"Context [{i+1}]: {res['response']}"
-                for i, res in enumerate(resources)
+            selected_docs = reranked_docs[: self.max_contexts]
+            resources = [
+                {
+                    "score": doc.metadata.get("rerank_score", 0.0),
+                    "page_content": doc.page_content,
+                    "response": doc.metadata.get("response", ""),
+                }
+                for doc in selected_docs
             ]
-        )
+
+            top_context = "\n\n".join(
+                [
+                    f"Context [{i+1}]: {res['response']}"
+                    for i, res in enumerate(resources)
+                ]
+            )
 
         if not language:
             language = "English"

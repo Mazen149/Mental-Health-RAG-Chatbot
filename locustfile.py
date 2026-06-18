@@ -37,7 +37,7 @@ class SanadUser(HttpUser):
     def chat_mental_health(self):
         """Simulate a user asking a mental health question (triggers RAG)"""
         payload = {
-            "message": "I've been feeling extremely anxious lately and having trouble sleeping. What can I do?"
+            "message": "who won the match between barcelona and real madrid yesterday?"
         }
         self.client.post("/chat", json=payload, name="/chat (Mental Health)", timeout=30.0)
 

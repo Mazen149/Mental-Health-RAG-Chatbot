@@ -188,16 +188,28 @@ class IntentClassifier:
     def __init__(self, llm_fallback: Callable[[str], Intent] | None = None):
         self.llm_fallback = llm_fallback or self._llm_fallback
 
-        self.model_name = config.GROQ_CLASSIFIER_MODEL
-
-        # Initialize DSPy LM if API key is available
-        groq_api_key = config.GROQ_API_KEY
-        if groq_api_key:
-            self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
+        # Initialize DSPy LM and clients (Lightning AI preferred, fallback to Groq)
+        lightning_api_key = config.LIGHTNING_API_KEY
+        if lightning_api_key:
+            self.model_name = config.LIGHTNING_CLASSIFIER_MODEL
+            dspy_model = self.model_name if self.model_name.startswith("openai/") else f"openai/{self.model_name}"
+            self.lm = dspy.LM(dspy_model, api_key=lightning_api_key, api_base="https://lightning.ai/api/v1")
             self.fallback_module = IntentClassifierModule()
-
-            self.groq_client = self.lm  # keep for backwards compatibility / mock checks
+            
+            # Setup OpenAI client for compatibility
+            from openai import OpenAI
+            self.groq_client = OpenAI(api_key=lightning_api_key, base_url="https://lightning.ai/api/v1")
+        elif config.GROQ_API_KEY:
+            self.model_name = config.GROQ_CLASSIFIER_MODEL
+            dspy_model = self.model_name if self.model_name.startswith("groq/") else f"groq/{self.model_name}"
+            self.lm = dspy.LM(dspy_model, api_key=config.GROQ_API_KEY)
+            self.fallback_module = IntentClassifierModule()
+            
+            # Setup Groq client
+            from groq import Groq
+            self.groq_client = Groq(api_key=config.GROQ_API_KEY)
         else:
+            self.model_name = "lightning-ai/gpt-oss-20b"
             self.lm = None
             self.fallback_module = None
             self.groq_client = None

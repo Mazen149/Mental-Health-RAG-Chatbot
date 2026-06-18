@@ -26,6 +26,15 @@
 
 ---
 
+## 🌐 Live Deployments
+
+*   **Frontend Website**: [Sanad Web App](https://mazen149.github.io/Mental-Health-RAG-Chatbot/)
+*   **Backend API**: [Sanad API](https://sanad-ai.myvnc.com)
+*   **API Documentation**: [Swagger Docs](https://sanad-ai.myvnc.com/docs)
+
+
+---
+
 ## 🌟 Overview
 
 **Sanad (سند)** is an advanced, production-grade **Mental Health Retrieval-Augmented Generation (RAG) Chatbot** designed to act as an empathetic, secure, and grounded workspace for counseling support.
@@ -39,7 +48,7 @@ See the [Monitoring & Observability](#-monitoring--observability-mlops) section 
 
 ## 🏗️ Architecture & Pipeline Flow
 
-The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy, as implemented in [router.py](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/src/router.py):
+The chatbot employs a multi-layered classification, routing, and retrieval pipeline to process messages with safety and empathy, as implemented in [router.py](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/last%20of%20last/src/router.py):
 
 ```mermaid
 graph TD
@@ -134,28 +143,39 @@ graph TD
 *   **📦 Multi-Container Docker Compose Stack**: Orchestrated a local development and production-ready container stack comprising the FastAPI backend, a production-grade Nginx frontend server, and a local LibSQL (Turso-compatible) database container for reliable multi-service orchestration.
 *   **☁️ Lightweight Cloud-Ready Deployment**:
     *   The complete `artifacts/` folder (1.1GB+ of vectorizers, databases, and ONNX models) is hosted remotely on Hugging Face ([`mazen248/sanad-ai-artifacts`](https://huggingface.co/mazen248/sanad-ai-artifacts/tree/main)).
-    *   An automated startup downloader (`huggingface_hub`) intelligently fetches only the missing required artifacts at runtime, keeping the GitHub repository footprint extremely small and enabling instant deployment to platforms like Render, AWS, or Heroku.
-
-## 📂 Project Structure
+    *   An automated startup downloader (`huggingface_hub`) intelligently fetches only the missing required artifacts at runtime, keeping the GitHub repository footprint extremely small## 📂 Project Structure
 
 ```bash
 Mental-Health-RAG-Chatbot/
+├── .dockerignore                     # Docker build exclusion rules
 ├── .env.example                      # Environment variables template
 ├── .gitignore                        # Git exclusion rules
-├── pyproject.toml                    # Hatchling project dependencies and tool configs
-├── uv.lock                           # Lockfile for reproducible environment state
+├── .pre-commit-config.yaml           # Pre-commit hooks configuration
+├── .python-version                   # Python version specification
+├── Dockerfile                        # Backend production container build
+├── docker-compose.yml                # Multi-service local orchestrator configuration
+├── locustfile.py                     # Locust performance load-testing script
 ├── main.py                           # Server startup entry point
+├── otel-collector-config.yaml        # OpenTelemetry collector configuration
+├── pyproject.toml                    # Hatchling project dependencies and tool configs
 ├── README.md                         # Project documentation
+├── uv.lock                           # Lockfile for reproducible environment state
 │
 ├── .github/                          # CI/CD Workflows
 │   └── workflows/
 │       └── deploy.yml                # Automated test, build, and EC2 SSH deployment
 │
+├── frontend/                         # Frontend SPA static client files
+│   ├── index.html                    # Layout and citation details drawer UI
+│   ├── style.css                     # Premium glassmorphic styling and layouts
+│   ├── app.js                        # Client-side logic (SSE, Whisper, settings modal)
+│   ├── nginx.conf                    # Nginx web server reverse-proxy configuration
+│   └── Dockerfile                    # Production Nginx container build
+│
 ├── terraform/                        # Modular AWS Infrastructure-as-Code
 │   ├── main.tf                       # Root wiring module
 │   ├── variables.tf                  # Root-level variables (AWS region, instance type, etc.)
 │   ├── outputs.tf                    # Root-level outputs (public IP, URL)
-│   ├── terraform.tfvars              # Configured values (gitignored)
 │   └── modules/
 │       ├── networking/               # VPC, Subnet, IGW, Route Table definitions
 │       ├── security/                 # Security Group definitions (Ports 22 & 8000)
@@ -165,6 +185,7 @@ Mental-Health-RAG-Chatbot/
 │   ├── __init__.py                   # Package initialization
 │   ├── app.py                        # FastAPI web server, auth sqlite database, STT and chatbot routes
 │   ├── config.py                     # Centralized path and environment settings manager
+│   ├── metrics.py                    # OpenTelemetry metrics recording and exporter setup
 │   ├── router.py                     # Dual-layer query routing logic (Regex + Embeddings + LLM fallback)
 │   │
 │   ├── modules/                      # Modularised machine learning & NLP inference engines
@@ -173,25 +194,26 @@ Mental-Health-RAG-Chatbot/
 │   │   ├── language_detector.py      # TF-IDF + Logistic Regression language classifier
 │   │   ├── intent_classifier.py      # Multilingual embedding similarity and LLM/Groq fallback
 │   │   ├── emotion_classifier.py     # Fast ONNX Inference for XLM-RoBERTa emotion classifier
-│   │   └── rag.py                    # FastEmbed Hybrid retrieval, character chunking, and NumPy reranking
+│   │   ├── multilingual_patterns.py  # Language regex fast-paths and query structures
+│   │   ├── rag.py                    # FastEmbed Hybrid retrieval, character chunking, and NumPy reranking
+│   │   └── rag_evaluation.py         # Evaluation and validation suite scoring run scripts
 │   │
-│   ├── prompts/                      # DSPy optimization, signatures, and datasets
-│   │   ├── prompts.py                # DSPy Modules (Router, Condenser, Response, General, Intent)
-│   │   ├── optimize_prompts.py       # Optimization harness script using GEPA compiler
-│   │   ├── dspy_training_data.py     # Labeled bootstrapping examples for prompt tuning
-│   │   └── dspy_evaluators.py        # Heuristic scoring metrics for compiling prompt versions
-│   │
-│   ├── static/                       # Frontend assets
-│   │   └── style.css                 # Main glassmorphic styling sheets for workspaces & auth
-│   │
-│   └── templates/                    # Web templates
-│       └── index.html                # Interactive login, register, and chat layout (Whisper voice integration)
+│   └── prompts/                      # DSPy optimization, signatures, and datasets
+│       ├── prompts.py                # DSPy Modules (Router, Condenser, Response, General, Intent)
+│       ├── optimize_prompts.py       # Optimization harness script using GEPA compiler
+│       ├── dspy_training_data.py     # Labeled bootstrapping examples for prompt tuning
+│       ├── dspy_evaluators.py        # Heuristic scoring metrics for compiling prompt versions
+│       └── dspy_overfit_analysis.py  # HPO and train vs test generalization evaluation harness
 │
 ├── tests/                            # Validation and testing suite
 │   ├── __init__.py                   # Test module setup
-│   ├── test_language_detector.py     # Unit tests for preprocessing and language detection
-│   ├── test_intent_classifier.py     # Unit tests for embedding classification & router fallback
+│   ├── test_api.py                   # Integration tests for chatbot stream endpoints and core API routes
+│   ├── test_auth.py                  # Unit tests for FastAPI user authentication and session credentials
 │   ├── test_emotion_classifier.py    # Unit tests for XLM-RoBERTa classification inference
+│   ├── test_feedback.py              # Unit and integration tests for user feedback data persistence
+│   ├── test_figurative_guardrail.py  # Unit tests verifying safeguards against prompt-injections
+│   ├── test_intent_classifier.py     # Unit tests for embedding classification & router fallback
+│   ├── test_language_detector.py     # Unit tests for preprocessing and language detection
 │   ├── test_mental_health_rag.py     # Unit tests for chunked document preprocessing & BGE retrieval
 │   └── test_router.py                # Unit tests for regex-based and intent-based routing
 │
@@ -203,18 +225,15 @@ Mental-Health-RAG-Chatbot/
 │   └── RAG_part2.ipynb               # Advanced chunking, BGE retrieval & reranking experiments
 │
 ├── metrics/                          # Model training performance evaluations and visualizations
-│   ├── language_detection/           # Confusion matrix for language detector
-│   │   └── temp_cm.png
-│   ├── intent_classifier/            # Intent classifier validation metrics
-│   │   ├── per_class_f1.png
-│   │   └── pipeline_results.png
-│   └── emotion_classification/       # Emotion adapter training logs and distribution plots
-│       ├── confusion_matrix.png
-│       └── eda_distribution.png
+│   ├── dspy_overfit_analysis/        # Radars, heatmaps, and JSON reports of prompt optimization
+│   ├── emotion_classification/       # Emotion adapter training logs and distribution plots
+│   ├── langauge_detection/           # Confusion matrix for language detector
+│   └── rag_evaluation/               # Comparative evaluation metrics plots and comparative routes
 │
 └── artifacts/                        # Serialized models, sqlite database, and prompt weights
     ├── chat_interactions.sqlite3     # SQLite DB storing user details & historical chat records
     ├── processed_docs.pkl            # Preprocessed, cached, and chunked LangChain documents list
+    ├── lid.176.ftz                   # FastText pre-trained language detection model
     ├── langauge_detection/           # Pickle model files for language detection
     │   ├── language_detection_best_model.pkl
     │   └── language_detection_best_vectorizer.pkl
@@ -233,97 +252,202 @@ Mental-Health-RAG-Chatbot/
 
 ---
 
+## 🎨 Frontend Application
+
+The frontend is a premium, glassmorphic Single Page Application (SPA) located in the [frontend/](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/last%20of%20last/frontend) folder. It is designed to be fully self-contained and communicates with the FastAPI backend through either direct HTTP calls (in development) or an Nginx reverse proxy (in production).
+
+### ✨ Features
+*   **🔐 Security Portal & Authentication**:
+    *   Centered **Login & Registration** cards styled in deep dark layouts matching provided guidelines.
+    *   Standard username and password inputs, plus confirm password checks for new account creations.
+    *   Integrates with FastAPI cookie sessions (`SessionMiddleware`) using secure credential management (`credentials: "include"`).
+    *   Automatically tracks and greets active users in the header panel (e.g., `WELCOME BACK, D`).
+*   **💬 Real-Time SSE Chat Streaming**:
+    *   Connects to the `/chat/stream` endpoint to stream empathetic responses word-by-word.
+    *   Utilizes browser `ReadableStream` reader pipelines for optimal performance.
+    *   Automatically handles markdown rendering and citation replacements.
+    *   Retains backward-compatible normal POST mode for regular endpoints like `/chat`.
+*   **🎙️ Integrated Voice Recording & Transcription**:
+    *   Quick recording icon (`btn-mic`) inside the capsule-shaped messaging input.
+    *   Relies on the standard HTML5 `MediaRecorder` API to record voice messages (WebM, OGG, or MP4 based on browser support).
+    *   Visual recording feedback: pulsating recording state and active timer directly inside the capsule.
+    *   Posts recorded audio to the `/transcribe` endpoint (powered by Whisper Large v3) and populates the query input box instantly.
+*   **👍 Like & Dislike Feedback**:
+    *   Floating thumbs up / thumbs down button icons displayed neatly below bot responses.
+    *   Allows users to submit helpfulness ratings to the `/feedback` endpoint.
+*   **📂 Retrieval Source Details Drawer**:
+    *   Clickable citation markers `[1]` and Match score chips directly inside bot replies.
+    *   Slides open a details drawer panel showing:
+        *   **Counseling Case Context**: The original clinical case study that was matched.
+        *   **Clinical Advice / Response**: The verified clinician response mapped to that case.
+    *   *Note: Emotion, intent, and language tags are processed on the backend but intentionally hidden from the frontend layout to keep the user interface minimal.*
+*   **🧹 Session History Clear**:
+    *   Keeps chat history loaded across page refreshes by querying `/chat/history`.
+    *   Toggles a DELETE request to `/chat/clear` to scrub interaction records on the server database.
+
+### ⚙️ Configuration & Connection Settings
+
+Click the **Gear Icon ⚙️** in the header (or click **API Settings** at the bottom of the login card) to customize backend options:
+*   **Backend API URL**: Specify the host IP/Domain of the FastAPI backend (e.g., `http://localhost:8000` or production URL).
+*   **Chat Endpoint**: Target endpoint (defaults to `/chat/stream`).
+
+Settings are persisted in the browser's `localStorage`.
+
+---
+
 ## 🛠️ Environment Variables Setup
 
 Create a `.env` file in the root directory and configure the following variables:
 
 ```env
+# ==============================================================================
+# SANAD AI — ENVIRONMENT CONFIGURATION
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Mandatory API Access Keys (Required)
+# ------------------------------------------------------------------------------
+# Groq Cloud API Key for high-speed LLM inference
 GROQ_API_KEY=your_groq_api_key_here
+
+# Hugging Face User Access Token for embedding models & sequence rerankers
 HF_TOKEN=your_hf_token_here
-HF_ARTIFACTS_REPO=mazen248/sanad-ai-artifacts
 
-# User Workspace Sessions
-SESSION_SECRET_KEY=your_secure_random_session_secret_here
-SESSION_COOKIE_SECURE=False
-SESSION_COOKIE_SAMESITE=lax
-
-# Qdrant Database Settings
-QDRANT_URL=
-QDRANT_API_KEY=
+# ------------------------------------------------------------------------------
+# 2. Database Configuration (Optional)
+# ------------------------------------------------------------------------------
+# Remote Qdrant Cloud database configurations.
+# If QDRANT_URL is left empty or commented out, the chatbot automatically
+# runs a local instance under the project's 'qdrant_db/' folder.
+QDRANT_URL=your_qdrant_url_here
+QDRANT_API_KEY=your_qdrant_api_key_here
 QDRANT_COLLECTION_NAME=mental_health
 
-# Remote Turso (libSQL) Database Settings (Falls back to local SQLite if empty)
-TURSO_DATABASE_URL=libsql://sanadchatinteractiondb-mazen248.aws-eu-west-1.turso.io
+# Remote Turso (libSQL) database configurations.
+# If TURSO_DATABASE_URL is left empty, the chatbot automatically
+# falls back to a local SQLite database.
+TURSO_DATABASE_URL=your_turso_database_url_here
 TURSO_AUTH_TOKEN=your_turso_auth_token_here
 
-# Model & Translation Settings
+# ------------------------------------------------------------------------------
+# 3. Model & Feature Adjustments (Optional)
+# ------------------------------------------------------------------------------
+# Toggle translation of incoming non-English queries to English (True/False)
 ENABLE_TRANSLATION=False
+
+# Configure specific Groq LLM model names
+# Fallbacks to "openai/gpt-oss-20b" if left empty.
 GROQ_GENERATION_MODEL=openai/gpt-oss-20b
 GROQ_CLASSIFIER_MODEL=openai/gpt-oss-20b
+
+# Configure embedding and reranker models
 EMBEDDING_MODEL=BAAI/bge-small-en-v1.5
 RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+
+# Emotion classification base model
 EMOTION_BASE_MODEL=xlm-roberta-base
 
-# LangSmith Observability (Optional)
-LANGCHAIN_TRACING_V2=true
-LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
-LANGCHAIN_API_KEY="your_langsmith_api_key_here"
-LANGCHAIN_PROJECT="sanad_ai"
+# Session & Cookie Configurations
+SESSION_COOKIE_SECURE=True
+SESSION_COOKIE_SAMESITE=none
+
+LANGSMITH_TRACING=true
+LANGSMITH_ENDPOINT=https://api.smith.langchain.com
+LANGSMITH_API_KEY=your_langsmith_api_key_here
+LANGSMITH_PROJECT=Sanad-AI
+
+HYPERDX_API_KEY=your_hyperdx_api_key_here
+
+# ------------------------------------------------------------------------------
+# 5. OpenTelemetry / Axiom Monitoring (Optional but recommended)
+# ------------------------------------------------------------------------------
+# Axiom API token — create one at https://app.axiom.co/settings/tokens
+AXIOM_API_TOKEN=your_axiom_api_token_here
+
+# Axiom dataset that receives metrics, traces, and logs
+AXIOM_METRICS_DATASET=nlp-project
+
+# OTLP endpoint.
+#   • With Docker Compose (recommended): point to the OTel Collector container
+#     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://otel-collector:4318/v1/metrics
+#   • For local dev (direct-to-Axiom, no collector):
+#     OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://api.axiom.co/v1/metrics
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://api.axiom.co/v1/metrics
+
+# How often metrics are pushed (milliseconds). Default: 15000 (15 s).
+OTEL_METRIC_EXPORT_INTERVAL_MS=15000
 ```
 
 ---
 
 ## 🚀 Getting Started
 
-### 🐳 Docker Hub Image (Recommended)
-The pre-built Docker image is available on Docker Hub. You can pull and run it directly:
+Follow the options below to run Sanad AI either using **Docker (Recommended)** or via **Local Development**.
+
+### ⚙️ Prerequisites
+
+Before starting, ensure you have configured your `.env` file in the root directory. You can copy the template:
+```powershell
+cp .env.example .env
+```
+Ensure you fill in the required keys, particularly `GROQ_API_KEY` and `HF_TOKEN`.
+
+---
+
+### 🐳 Option 1: Running with Docker (Recommended)
+
+Docker handles all dependencies, vector databases, and Nginx reverse proxying out-of-the-box.
+
+#### A. Multi-Container Orchestration (Docker Compose)
+Spins up the FastAPI backend, Nginx frontend (served on port `3000`), and a local LibSQL container.
+1. Spin up the stack:
+   ```powershell
+   docker compose up -d --build
+   ```
+2. **Accessing the Workspace**:
+   * **Frontend Interface**: Open [http://localhost:3000](http://localhost:3000)
+   * **Interactive API Documentation (Swagger)**: Open [http://localhost:8000/docs](http://localhost:8000/docs)
+
+#### B. Single Backend Container (Docker Hub)
+Pull and run the pre-built backend image from Docker Hub directly:
 ```powershell
 docker pull mazen1393/sanad-ai-backend:latest
 docker run --env-file .env -p 8000:8000 mazen1393/sanad-ai-backend:latest
 ```
 
-### 🐳 Docker Compose Multi-Container Setup
-For a fully containerized orchestration including the FastAPI backend, Nginx web server frontend, and a local LibSQL (SQLite-compatible server) database container:
+---
 
-1. Ensure you have your `.env` file configured in the root directory.
-2. Spin up the entire service stack in detached mode:
-   ```powershell
-   docker compose up -d --build
-   ```
-3. Open `http://localhost:3000` in your browser to access the frontend workspace, or check API documentation at `http://localhost:8000/docs`.
+### 💻 Option 2: Local Python Setup (Development)
 
-### Local Setup
 We recommend using [uv](https://github.com/astral-sh/uv) to manage project dependencies and virtual environments.
 
-### 1. Install Dependencies
+#### 1. Install Dependencies
 Initialize and sync your local virtual environment:
 ```powershell
 uv sync
 ```
 
-### 2. Run the FastAPI Application
-Start the FastAPI server:
+#### 2. Run the FastAPI Application
+Start the FastAPI server in development mode:
 ```powershell
 uv run main.py
 ```
+Open [http://localhost:8000](http://localhost:8000) in your browser to interact with the workspace login/registration interface.
 
-For production deployments, to optimize performance and bypass PyTorch Global Interpreter Lock (GIL) thread contention under concurrent requests, run the app using multiple Uvicorn workers:
+To run the application with high concurrency (production configuration with multiple workers bypasses PyTorch GIL bottlenecks):
 ```powershell
 uv run uvicorn src.app:app --host 0.0.0.0 --port 8000 --workers 4
 ```
 
-Open [http://localhost:8000](http://localhost:8000) in your browser to interact with the workspace login/registration interface.
-
-### 3. Run DSPy GEPA Prompt Optimization
-To compile and optimize the chatbot prompt instructions using the training data:
+#### 3. Run DSPy GEPA Prompt Optimization
+To compile and optimize prompt signatures using bootstrapped training datasets:
 ```powershell
-# Optimize all modules
 uv run python src/prompts/optimize_prompts.py --module all
 ```
-*Note: Make sure your reflection LLM (e.g., Ollama's Qwen2.5) is running locally on port 11434.*
+> 📌 *Note: Ensure your generator LLM (e.g., Ollama's Qwen2.5) is running locally on port 11434.*
 
-### 4. Run Unit Tests
-Verify routing, pipeline configurations, and classifier modules:
+#### 4. Run Unit Tests
+Validate routing, pipeline, and classifier configurations:
 ```powershell
 uv run pytest
 ```
@@ -458,7 +582,7 @@ This confirms that the GEPA compiler successfully optimized instructions and few
 
 You can view the full overfit analysis logs, heatmap comparisons, and radar diagrams inside the `metrics/dspy_overfit_analysis/` directory.
 
-You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/project%20github%203/notebooks/RAG_part2.ipynb) files.
+You can inspect the evaluation run details, validation logs, and prompt comparisons inside the [notebooks/RAG_part1.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/last%20of%20last/notebooks/RAG_part1.ipynb) and [notebooks/RAG_part2.ipynb](file:///d:/ITI/ITI%20Courses/18%29%20NLP/Project/last%20of%20last/notebooks/RAG_part2.ipynb) files.
 
 ---
 
@@ -594,9 +718,7 @@ uv run locust -f locustfile.py --headless -u 50 -r 5 --run-time 1m --host http:/
 Below are the results of simulating concurrent user traffic against the API endpoints:
 
 <p align="center">
-  <img src="assets/locust-0.png" alt="Locust Test Run" width="850"/>
-  <br>
-  <img src="assets/locust-1.png" alt="Locust Request Statistics" width="850"/>
+  <img src="assets/locust results.jpeg" alt="Locust Load Testing Results" width="850"/>
 </p>
 
 ---
@@ -614,19 +736,4 @@ We evaluated several Large Language Models on a set of standardized counseling q
 
 > Note: We selected **GPT-OSS-20B** for our baseline as it provided the optimal balance of inference speed and emotional attunement.
 
----
 
-## 🌐 Deployed API (AWS)
-
-- **Backend API**: `https://sanad-ai.myvnc.com`
-- **Swagger Docs**: `https://sanad-ai.myvnc.com/docs`
-- **Frontend**: `https://mazen149.github.io/Mental-Health-RAG-Chatbot/`
-
----
-
-## 👥 Team Members
-
-This project was built and is maintained by:
-1. **Ahmed Ashraf Abdulwahab Saleem**
-2. **Mazen Mohamed Montaset Elsay**
-3. **Peter Hany Fayez**

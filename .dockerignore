@@ -61,3 +61,6 @@ build/
 # ── Miscellaneous ──
 .pre-commit-config.yaml
 team_members.txt
+
+# ── Frontend (for backend context isolation) ──
+frontend/

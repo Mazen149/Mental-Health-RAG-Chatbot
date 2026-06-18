@@ -1,5 +1,5 @@
 # =============================================================================
-# Sanad AI — CI/CD Pipeline
+# Sanad AI — Backend CI/CD Pipeline
 # =============================================================================
 # Stages:
 #   1. Test    — Install deps & run pytest
@@ -7,13 +7,17 @@
 #   3. Deploy  — SSH into EC2, pull latest image, restart container
 # =============================================================================
 
-name: CI/CD Pipeline
+name: Backend CI/CD Pipeline
 
 on:
   push:
-    branches: [backend]
+    branches: [backend, main]
+    paths-ignore:
+      - 'frontend/**'
   pull_request:
-    branches: [backend]
+    branches: [backend, main]
+    paths-ignore:
+      - 'frontend/**'
 
 env:
   DOCKER_IMAGE: mazen1393/sanad-ai-backend
@@ -53,7 +57,7 @@ jobs:
     name: Build & Push
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/backend'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/backend' || github.ref == 'refs/heads/main')
 
     steps:
       - name: Checkout code
@@ -88,7 +92,7 @@ jobs:
     name: Deploy to EC2
     runs-on: ubuntu-latest
     needs: build
-    if: github.event_name == 'push' && github.ref == 'refs/heads/backend'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/backend' || github.ref == 'refs/heads/main')
 
     steps:
       - name: Deploy via SSH

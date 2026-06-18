@@ -1,0 +1,91 @@
+# =============================================================================
+# Sanad AI — Frontend CI/CD Pipeline
+# =============================================================================
+# Stages:
+#   1. Deploy Pages    — Deploy static frontend files to GitHub Pages (Main branch only)
+#   2. Build & Push    — Build Docker image & push to Docker Hub
+# =============================================================================
+
+name: Frontend CI/CD Pipeline
+
+on:
+  push:
+    branches: [frontend, main]
+    paths:
+      - 'frontend/**'
+  pull_request:
+    branches: [frontend, main]
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 1: Deploy static files to GitHub Pages
+  # ─────────────────────────────────────────────────────────────────────────
+  deploy-pages:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Pointing to the frontend directory containing index.html, style.css, app.js
+          path: frontend
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Stage 2: Build & Push Docker Image
+  # ─────────────────────────────────────────────────────────────────────────
+  build-and-push:
+    name: Build & Push Frontend Image
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/frontend' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: true
+          tags: |
+            mazen1393/sanad-ai-frontend:latest
+            mazen1393/sanad-ai-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

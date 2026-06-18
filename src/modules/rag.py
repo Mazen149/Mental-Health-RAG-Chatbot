@@ -414,27 +414,43 @@ class MentalHealthRAG:
         self.qdrant_client = None
 
         # Generation model and chunk settings
-        self.model_name = config.GROQ_GENERATION_MODEL
         self.chunk_size = 500
         self.chunk_overlap = 100
         self.max_contexts = 5
 
-        # Initialize DSPy modules
-        groq_api_key = config.GROQ_API_KEY
-        if groq_api_key:
-            self.lm = dspy.LM(f"groq/{self.model_name}", api_key=groq_api_key)
+        # Initialize DSPy modules and clients (Lightning AI preferred, fallback to Groq)
+        lightning_api_key = config.LIGHTNING_API_KEY
+        if lightning_api_key:
+            self.model_name = config.LIGHTNING_GENERATION_MODEL
+            dspy_model = self.model_name if self.model_name.startswith("openai/") else f"openai/{self.model_name}"
+            self.lm = dspy.LM(dspy_model, api_key=lightning_api_key, api_base="https://lightning.ai/api/v1")
+            
+            # Setup standard OpenAI client for direct API calls (e.g. translation, metadata checks)
+            from openai import OpenAI
+            self.client = OpenAI(api_key=lightning_api_key, base_url="https://lightning.ai/api/v1")
+        elif config.GROQ_API_KEY:
+            self.model_name = config.GROQ_GENERATION_MODEL
+            dspy_model = self.model_name if self.model_name.startswith("groq/") else f"groq/{self.model_name}"
+            self.lm = dspy.LM(dspy_model, api_key=config.GROQ_API_KEY)
+            
+            # Setup standard Groq client
+            from groq import Groq
+            self.client = Groq(api_key=config.GROQ_API_KEY)
+        else:
+            self.model_name = "lightning-ai/gpt-oss-20b"
+            self.lm = None
+            self.client = None
+
+        if self.lm:
             self.condense_module = QueryCondenserModule()
             self.grounded_module = GroundedResponseModule()
             self.general_module = GeneralConversationModule()
             self.retrieval_router = RetrievalRouterModule()
-            self.client = self.lm  # keep for backwards compatibility / mock checks
         else:
-            self.lm = None
             self.condense_module = None
             self.grounded_module = None
             self.general_module = None
             self.retrieval_router = None
-            self.client = None
 
     def load_and_preprocess(
         self,

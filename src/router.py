@@ -65,9 +65,19 @@ def translate_to_english(text: str, client=None) -> str:
         if all(ord(c) < 128 for c in text):
             return text
 
-        # Attempt to translate using Groq LLM client if passed
+        # Attempt to translate using LLM client if passed
         if client is not None:
             try:
+                # Determine model name dynamically
+                model_to_use = config.LIGHTNING_GENERATION_MODEL if config.LIGHTNING_API_KEY else config.GROQ_GENERATION_MODEL
+                
+                # Strip DSPy driver prefixes (like openai/ or groq/) for raw completions API compatibility
+                model_name_clean = model_to_use
+                if model_name_clean.startswith("openai/"):
+                    model_name_clean = model_name_clean.replace("openai/", "", 1)
+                elif model_name_clean.startswith("groq/"):
+                    model_name_clean = model_name_clean.replace("groq/", "", 1)
+                
                 sys_prompt = (
                     "You are a highly accurate translation assistant. "
                     "Translate the user's input text to English. "
@@ -78,7 +88,7 @@ def translate_to_english(text: str, client=None) -> str:
                         {"role": "system", "content": sys_prompt},
                         {"role": "user", "content": text},
                     ],
-                    model="openai/gpt-oss-20b",
+                    model=model_name_clean,
                     temperature=0.0,
                 )
                 translated = chat_completion.choices[0].message.content.strip()
@@ -88,12 +98,12 @@ def translate_to_english(text: str, client=None) -> str:
                     translated = translated[1:-1].strip()
                 if translated:
                     safe_print(
-                        f"--> [Translator] Successfully translated query using Groq LLM: '{translated}'"
+                        f"--> [Translator] Successfully translated query using LLM ({model_name_clean}): '{translated}'"
                     )
                     return translated
             except Exception as llm_err:
                 safe_print(
-                    f"--> [Translator Warning] Groq LLM translation failed, falling back to local: {llm_err}"
+                    f"--> [Translator Warning] LLM translation failed, falling back to local: {llm_err}"
                 )
 
         # Fallback to local model

@@ -58,6 +58,8 @@ class Config:
     # ------------------------------------------------------------------------------
     # 4. Model Names & Settings
     # ------------------------------------------------------------------------------
+    LIGHTNING_GENERATION_MODEL = os.getenv("LIGHTNING_GENERATION_MODEL", "lightning-ai/gpt-oss-20b")
+    LIGHTNING_CLASSIFIER_MODEL = os.getenv("LIGHTNING_CLASSIFIER_MODEL", "lightning-ai/gpt-oss-20b")
     GROQ_GENERATION_MODEL = os.getenv("GROQ_GENERATION_MODEL", "openai/gpt-oss-20b")
     GROQ_CLASSIFIER_MODEL = os.getenv("GROQ_CLASSIFIER_MODEL", "openai/gpt-oss-20b")
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
@@ -67,6 +69,7 @@ class Config:
     # ------------------------------------------------------------------------------
     # 5. API Keys & Connections
     # ------------------------------------------------------------------------------
+    LIGHTNING_API_KEY = os.getenv("LIGHTNING_API_KEY")
     GROQ_API_KEY = os.getenv("GROQ_API_KEY")
     HF_TOKEN = os.getenv("HF_TOKEN")
     HF_ARTIFACTS_REPO = os.getenv("HF_ARTIFACTS_REPO", "mazen248/sanad-ai-artifacts")

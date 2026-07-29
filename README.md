@@ -29,8 +29,8 @@
 ## 🌐 Live Deployments
 
 *   **Frontend Website**: [Sanad Web App](https://mazen149.github.io/Mental-Health-RAG-Chatbot/)
-*   **Backend API**: [Sanad API](https://sanad-ai.myvnc.com)
-*   **API Documentation**: [Swagger Docs](https://sanad-ai.myvnc.com/docs)
+*   **Backend API**: [Sanad API](http://sanad-ai.servehttp.com:8000)
+*   **API Documentation**: [Swagger Docs](http://sanad-ai.servehttp.com:8000/docs)
 
 
 ---

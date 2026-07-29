@@ -16,6 +16,24 @@ resource "aws_security_group" "app" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # HTTP access (Port 80 for Certbot ACME challenge and Nginx)
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # HTTPS access (Port 443 for SSL/TLS)
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   # Application HTTP access (FastAPI on port 8000)
   ingress {
     description = "App HTTP"

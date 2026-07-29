@@ -43,7 +43,7 @@ const STORAGE_KEY = "sanad_ai_settings";
 const defaults = {
   apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:8000" // Local development backend address
-    : "https://sanad-ai.myvnc.com",
+    : "http://sanad-ai.servehttp.com",
   endpoint: "/chat/stream" // Defaulting to SSE streaming
 };
 
@@ -119,12 +119,12 @@ async function loadHistory() {
       }
       return;
     }
-    
+
     const data = await res.json();
     chatArea.innerHTML = "";
     chatHistory = [];
     botResourcesMap.clear();
-    
+
     if (data && data.length > 0) {
       removeWelcome();
       data.forEach(item => {
@@ -168,15 +168,15 @@ loginForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const username = loginUsernameInput.value.trim();
   const password = loginPasswordInput.value.trim();
-  
+
   if (!username || !password) return;
-  
+
   const submitBtn = loginForm.querySelector(".btn-auth-submit");
   submitBtn.disabled = true;
   loginError.style.display = "none";
-  
+
   const url = proxyUrl(settings.apiUrl + "/login");
-  
+
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -184,21 +184,21 @@ loginForm.addEventListener("submit", async (e) => {
       body: JSON.stringify({ username, password }),
       credentials: "include"
     });
-    
+
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.detail || `Server returned ${res.status}`);
     }
-    
+
     currentUser = data.username || username;
     localStorage.setItem("sanad_username", currentUser);
     localStorage.setItem("sanad_logged_in", "true");
-    
+
     authOverlay.classList.add("hidden");
     welcomeUser.textContent = currentUser.toUpperCase();
-    
+
     await loadHistory();
-    
+
     loginUsernameInput.value = "";
     loginPasswordInput.value = "";
   } catch (err) {
@@ -214,21 +214,21 @@ registerForm.addEventListener("submit", async (e) => {
   const username = registerUsernameInput.value.trim();
   const password = registerPasswordInput.value.trim();
   const confirmPassword = registerConfirmPasswordInput.value.trim();
-  
+
   if (!username || !password || !confirmPassword) return;
-  
+
   if (password !== confirmPassword) {
     registerError.textContent = "Passwords do not match.";
     registerError.style.display = "block";
     return;
   }
-  
+
   const submitBtn = registerForm.querySelector(".btn-auth-submit");
   submitBtn.disabled = true;
   registerError.style.display = "none";
-  
+
   const url = proxyUrl(settings.apiUrl + "/register");
-  
+
   try {
     const res = await fetch(url, {
       method: "POST",
@@ -236,25 +236,25 @@ registerForm.addEventListener("submit", async (e) => {
       body: JSON.stringify({ username, password }),
       credentials: "include"
     });
-    
+
     const data = await res.json();
     if (!res.ok) {
       throw new Error(data.detail || `Server returned ${res.status}`);
     }
-    
+
     currentUser = data.username || username;
     localStorage.setItem("sanad_username", currentUser);
     localStorage.setItem("sanad_logged_in", "true");
-    
+
     authOverlay.classList.add("hidden");
     welcomeUser.textContent = currentUser.toUpperCase();
-    
+
     await loadHistory();
-    
+
     registerUsernameInput.value = "";
     registerPasswordInput.value = "";
     registerConfirmPasswordInput.value = "";
-    
+
     // Auto switch card state back to login for future sessions
     registerCard.classList.add("hidden");
     loginCard.classList.remove("hidden");
@@ -275,7 +275,7 @@ logoutBtn.addEventListener("click", async () => {
   } catch (err) {
     console.error("Logout request failed:", err);
   }
-  
+
   currentUser = null;
   localStorage.removeItem("sanad_username");
   localStorage.removeItem("sanad_logged_in");
@@ -418,11 +418,11 @@ function addBotMessage(text, userMessage, resources = []) {
           Sources:
         </span>
         ${resources.map((res, index) => {
-          const scoreVal = typeof res.score === 'number'
-            ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
-            : 100;
-          return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
-        }).join("")}
+      const scoreVal = typeof res.score === 'number'
+        ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
+        : 100;
+      return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
+    }).join("")}
       </div>
     `;
   }
@@ -528,11 +528,11 @@ function renderSourcesList(container, resources) {
       Sources:
     </span>
     ${resources.map((res, index) => {
-      const scoreVal = typeof res.score === 'number'
-        ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
-        : 100;
-      return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
-    }).join("")}
+    const scoreVal = typeof res.score === 'number'
+      ? (res.score <= 1.0 ? Math.round(res.score * 100) : Math.round(res.score))
+      : 100;
+    return `<button class="source-chip" data-idx="${index}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="source-chip-icon"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg><span class="source-idx">${index + 1}</span><span class="source-match">${scoreVal}% Match</span></button>`;
+  }).join("")}
   `;
   container.style.display = "flex";
 }
@@ -714,10 +714,10 @@ async function startRecording() {
       alert("Voice recording is not supported in your browser.");
       return;
     }
-    
+
     audioChunks = [];
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    
+
     let options = { mimeType: "audio/webm" };
     if (!MediaRecorder.isTypeSupported(options.mimeType)) {
       options = { mimeType: "audio/ogg" };
@@ -728,33 +728,33 @@ async function startRecording() {
         }
       }
     }
-    
+
     mediaRecorder = new MediaRecorder(micStream, options);
     mediaRecorder.addEventListener("dataavailable", (e) => {
       if (e.data.size > 0) {
         audioChunks.push(e.data);
       }
     });
-    
+
     mediaRecorder.addEventListener("stop", async () => {
       const mimeType = mediaRecorder.mimeType || "audio/wav";
       const audioBlob = new Blob(audioChunks, { type: mimeType });
-      
+
       if (micStream) {
         micStream.getTracks().forEach(track => track.stop());
       }
-      
+
       await transcribeAudio(audioBlob);
     });
-    
+
     mediaRecorder.start();
     isRecording = true;
     micBtn.classList.add("recording");
-    
+
     input.style.display = "none";
     recordingStatus.style.display = "flex";
     if (transcribingStatus) transcribingStatus.style.display = "none";
-    
+
     recordingSeconds = 0;
     recordingTimer.textContent = "0s";
     recordingInterval = setInterval(() => {
@@ -778,9 +778,9 @@ async function startRecording() {
 
       function checkSilence() {
         if (!isRecording) return;
-        
+
         analyser.getFloatTimeDomainData(dataArray);
-        
+
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) {
           sum += dataArray[i] * dataArray[i];
@@ -796,15 +796,15 @@ async function startRecording() {
             return;
           }
         }
-        
+
         requestAnimationFrame(checkSilence);
       }
-      
+
       requestAnimationFrame(checkSilence);
     } catch (ae) {
       console.warn("AudioContext setup failed, silence detection disabled:", ae);
     }
-    
+
   } catch (err) {
     console.error("Microphone recording start failed:", err);
     alert("Could not access microphone: " + err.message);
@@ -813,15 +813,15 @@ async function startRecording() {
 
 function stopRecording() {
   if (!isRecording) return;
-  
+
   clearInterval(recordingInterval);
   if (mediaRecorder && mediaRecorder.state !== "inactive") {
     mediaRecorder.stop();
   }
-  
+
   isRecording = false;
   micBtn.classList.remove("recording");
-  
+
   recordingStatus.style.display = "none";
   if (transcribingStatus) {
     transcribingStatus.style.display = "flex";
@@ -831,30 +831,30 @@ function stopRecording() {
     if (audioContext && audioContext.state !== "closed") {
       audioContext.close();
     }
-  } catch (e) {}
+  } catch (e) { }
   audioContext = null;
   analyser = null;
 }
 
 async function transcribeAudio(audioBlob) {
   micBtn.disabled = true;
-  
+
   try {
     const formData = new FormData();
     const ext = audioBlob.type.split("/")[1]?.split(";")[0] || "webm";
     formData.append("file", audioBlob, `audio.${ext}`);
-    
+
     const url = proxyUrl(settings.apiUrl + "/transcribe");
     const res = await fetch(url, {
       method: "POST",
       body: formData,
       credentials: "include"
     });
-    
+
     if (!res.ok) {
       throw new Error(`Failed to transcribe: ${res.statusText}`);
     }
-    
+
     const data = await res.json();
     if (data && data.text) {
       input.value = data.text.trim();
@@ -957,18 +957,18 @@ settingsModal.addEventListener("click", (e) => {
 
 settingsForm.addEventListener("submit", (e) => {
   e.preventDefault();
-  
+
   const apiUrlVal = settingsApiUrlInput.value.trim();
   const endpointVal = settingsChatEndpointInput.value.trim();
-  
+
   if (!apiUrlVal || !endpointVal) return;
-  
+
   settings.apiUrl = apiUrlVal;
   settings.endpoint = endpointVal;
-  
+
   saveSettings(settings);
   hideSettingsModal();
-  
+
   // Re-verify authentication/connection with the new API URL
   checkAuth();
 });

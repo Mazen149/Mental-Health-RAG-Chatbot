@@ -43,7 +43,7 @@ const STORAGE_KEY = "sanad_ai_settings";
 const defaults = {
   apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:8000" // Local development backend address
-    : "http://sanad-ai.servehttp.com",
+    : "https://sanad-ai.servehttp.com",
   endpoint: "/chat/stream" // Defaulting to SSE streaming
 };
 

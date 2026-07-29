@@ -3,6 +3,28 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
+import re
+
+
+def _clean_env_val(val: str | None) -> str | None:
+    if not val:
+        return None
+    cleaned = val.strip()
+    if not cleaned or cleaned.lower().startswith("your_") or cleaned.lower() in ("none", "null", "undefined"):
+        return None
+    return cleaned
+
+
+def _format_qdrant_url(url: str | None) -> str | None:
+    cleaned = _clean_env_val(url)
+    if not cleaned:
+        return None
+    if ("cloud.qdrant.io" in cleaned or "qdrant.tech" in cleaned):
+        if not re.search(r":\d+$", cleaned.rstrip("/")):
+            cleaned = cleaned.rstrip("/") + ":6333"
+    return cleaned
+
+
 class Config:
     """Centralized configuration and path management for Sanad AI."""
 
@@ -69,12 +91,12 @@ class Config:
     # ------------------------------------------------------------------------------
     # 5. API Keys & Connections
     # ------------------------------------------------------------------------------
-    LIGHTNING_API_KEY = os.getenv("LIGHTNING_API_KEY")
-    GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-    HF_TOKEN = os.getenv("HF_TOKEN")
+    LIGHTNING_API_KEY = _clean_env_val(os.getenv("LIGHTNING_API_KEY"))
+    GROQ_API_KEY = _clean_env_val(os.getenv("GROQ_API_KEY"))
+    HF_TOKEN = _clean_env_val(os.getenv("HF_TOKEN"))
     HF_ARTIFACTS_REPO = os.getenv("HF_ARTIFACTS_REPO", "mazen248/sanad-ai-artifacts")
-    QDRANT_URL = os.getenv("QDRANT_URL")
-    QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+    QDRANT_URL = _format_qdrant_url(os.getenv("QDRANT_URL"))
+    QDRANT_API_KEY = _clean_env_val(os.getenv("QDRANT_API_KEY"))
     QDRANT_COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "mental_health")
 
     # ------------------------------------------------------------------------------
@@ -82,8 +104,8 @@ class Config:
     # ------------------------------------------------------------------------------
     SESSION_SECRET_KEY = os.getenv("SESSION_SECRET_KEY", "dev-secret-change-me")
     CHAT_DATABASE_PATH = ARTIFACTS_DIR / "chat_interactions.sqlite3"
-    TURSO_DATABASE_URL = os.getenv("TURSO_DATABASE_URL")
-    TURSO_AUTH_TOKEN = os.getenv("TURSO_AUTH_TOKEN")
+    TURSO_DATABASE_URL = _clean_env_val(os.getenv("TURSO_DATABASE_URL"))
+    TURSO_AUTH_TOKEN = _clean_env_val(os.getenv("TURSO_AUTH_TOKEN"))
 
     # Determine secure cookie settings for cross-origin production environments
     import sys

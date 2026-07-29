@@ -58,7 +58,12 @@ function proxyUrl(url) {
 
 function loadSettings() {
   try {
-    return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY)) };
+    const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
+    if (s && s.apiUrl && s.apiUrl.includes("myvnc.com")) {
+      delete s.apiUrl;
+      localStorage.removeItem(STORAGE_KEY);
+    }
+    return { ...defaults, ...s };
   } catch {
     return { ...defaults };
   }

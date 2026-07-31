@@ -95,6 +95,21 @@ jobs:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/backend' || github.ref == 'refs/heads/main')
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Copy config files to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          source: "docker-compose.yml,otel-collector-config.yaml"
+          target: "~/"
+          strip_components: 0
+
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -105,28 +120,30 @@ jobs:
           script: |
             set -euxo pipefail
 
-            # Write the .env file from the environment variable safely
-            echo "$ENV_FILE_CONTENT" > ~/app.env
+            export APP_DIR="$HOME/sanad-app"
 
-            # Pull the latest image
-            docker pull ${{ env.DOCKER_IMAGE }}:latest
+            # Ensure the app directory has the latest config files
+            mkdir -p "$APP_DIR"
+            cp ~/docker-compose.yml "$APP_DIR/docker-compose.yml"
+            cp ~/otel-collector-config.yaml "$APP_DIR/otel-collector-config.yaml"
 
-            # Stop and remove the old container (ignore errors if not running)
-            docker stop sanad-ai 2>/dev/null || true
-            docker rm sanad-ai 2>/dev/null || true
+            # Write the .env file from the secret into the app directory
+            echo "$ENV_FILE_CONTENT" > "$APP_DIR/.env"
+            chmod 600 "$APP_DIR/.env"
 
-            # Start the new container
-            docker run -d \
-              --name sanad-ai \
-              --env-file ~/app.env \
-              -p 8000:8000 \
-              --restart unless-stopped \
-              ${{ env.DOCKER_IMAGE }}:latest
+            cd "$APP_DIR"
 
-            # Clean up old images to save disk space
+            # Pull the latest backend image
+            docker compose pull backend
+
+            # Recreate only changed containers (keeps libsql / otel-collector
+            # running if they are already healthy and unchanged)
+            docker compose up -d --remove-orphans
+
+            # Clean up dangling images to save disk space
             docker image prune -f
 
-            # Wait for the app to start (health check with retries)
+            # Wait for the backend to become healthy (health check with retries)
             echo "Waiting for health check..."
             for i in $(seq 1 30); do
               if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
@@ -138,7 +155,7 @@ jobs:
             done
 
             echo "❌ Health check failed after 5 minutes"
-            docker logs sanad-ai --tail 50
+            docker compose logs backend --tail 50
             exit 1
         env:
           ENV_FILE_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}

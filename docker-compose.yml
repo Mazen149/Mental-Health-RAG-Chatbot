@@ -48,7 +48,7 @@ services:
     command: [ "--config=/etc/otelcol/otel-collector-config.yaml" ]
 
     volumes:
-      - ./otel-collector-config.yaml:/etc/otelcol/otel-collector-config.yaml:ro
+      - ${APP_DIR:-~/sanad-app}/otel-collector-config.yaml:/etc/otelcol/otel-collector-config.yaml:ro
 
     ports:
       - "4317:4317" # gRPC OTLP receiver
@@ -95,13 +95,13 @@ services:
 
     environment:
       - PYTHONUNBUFFERED=1 # Ensure real-time log output
-      - TURSO_DATABASE_URL=http://libsql:8080
-      - TURSO_AUTH_TOKEN=
-      - QDRANT_URL=
-      - QDRANT_API_KEY=
       # OTel: send to the collector container (not directly to Axiom)
       - OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=http://otel-collector:4318/v1/metrics
       - OTEL_METRIC_EXPORT_INTERVAL_MS=15000
+
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
     volumes:
       - backend-artifacts:/app/artifacts # Persist downloaded HF models
@@ -111,8 +111,6 @@ services:
       - sanad-network
 
     depends_on:
-      libsql:
-        condition: service_started
       otel-collector:
         condition: service_started
 

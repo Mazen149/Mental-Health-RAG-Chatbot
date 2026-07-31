@@ -122,6 +122,17 @@ jobs:
 
             export APP_DIR="$HOME/sanad-app"
 
+            # ── Ensure Docker Compose V2 plugin is installed ──────────────────
+            if ! docker compose version > /dev/null 2>&1; then
+              echo "Installing Docker Compose V2 plugin..."
+              DOCKER_CLI_PLUGINS="$HOME/.docker/cli-plugins"
+              mkdir -p "$DOCKER_CLI_PLUGINS"
+              curl -SL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-$(uname -m)" \
+                -o "$DOCKER_CLI_PLUGINS/docker-compose"
+              chmod +x "$DOCKER_CLI_PLUGINS/docker-compose"
+              echo "Docker Compose V2 installed: $(docker compose version)"
+            fi
+
             # Ensure the app directory has the latest config files
             mkdir -p "$APP_DIR"
             cp ~/docker-compose.yml "$APP_DIR/docker-compose.yml"

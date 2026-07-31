@@ -142,6 +142,10 @@ jobs:
             echo "$ENV_FILE_CONTENT" > "$APP_DIR/.env"
             chmod 600 "$APP_DIR/.env"
 
+            # ── Stop & remove legacy standalone container (frees port 8000) ──
+            docker stop sanad-ai sanad-backend 2>/dev/null || true
+            docker rm   sanad-ai sanad-backend 2>/dev/null || true
+
             cd "$APP_DIR"
 
             # Pull the latest backend image

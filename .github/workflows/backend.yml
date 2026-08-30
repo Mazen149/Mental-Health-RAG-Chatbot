@@ -166,8 +166,15 @@ jobs:
             docker compose pull backend
 
             # Recreate only changed containers (keeps libsql / otel-collector
-            # running if they are already healthy and unchanged)
-            docker compose up -d --remove-orphans
+            # running if they are already healthy and unchanged).
+            # If the backend fails to come up, dump its logs before exiting —
+            # otherwise `set -e` aborts here and the failure reason is lost.
+            if ! docker compose up -d --remove-orphans; then
+              echo "===== docker compose up failed — backend logs below ====="
+              docker compose logs backend --tail 200 || true
+              docker compose ps || true
+              exit 1
+            fi
 
             # Clean up dangling images to save disk space
             docker image prune -f

@@ -559,7 +559,26 @@ class MentalHealthRAG:
 
         if qdrant_url:
             print(f"--> [RAG Setup] Connecting to Qdrant Cloud at: {qdrant_url}")
-            self.qdrant_client = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
+            try:
+                self.qdrant_client = QdrantClient(
+                    url=qdrant_url, api_key=qdrant_api_key
+                )
+                # Force a real round-trip; constructing the client is lazy.
+                self.qdrant_client.get_collections()
+            except Exception as e:
+                # Remote cluster unreachable (suspended, deleted, network) —
+                # degrade to the local database instead of failing startup.
+                print(
+                    f"--> [RAG Setup] Remote Qdrant unreachable ({e}). "
+                    f"Falling back to local database at: {self.qdrant_path}"
+                )
+                try:
+                    self.qdrant_client.close()
+                except Exception:
+                    pass
+                qdrant_url = None
+                qdrant_api_key = None
+                self.qdrant_client = QdrantClient(path=self.qdrant_path)
         else:
             print(
                 f"--> [RAG Setup] Connecting to local Qdrant database at: {self.qdrant_path}"

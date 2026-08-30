@@ -219,7 +219,18 @@ def validate_environment() -> None:
                     )
             client.close()
         except Exception as e:
-            errors.append(f"Failed to connect to Qdrant or query collection: {e}")
+            # An unreachable *remote* Qdrant must not take the whole service
+            # down: the RAG layer falls back to the local Qdrant database.
+            # Only fail hard when there is no fallback (local-only config).
+            if qdrant_url:
+                logger.warning(
+                    f"Could not reach remote Qdrant at {qdrant_url}: {e}. "
+                    f"Falling back to the local Qdrant database at {qdrant_local_path}."
+                )
+            else:
+                errors.append(
+                    f"Failed to connect to Qdrant or query collection: {e}"
+                )
 
     if errors:
         logger.error("\n" + "=" * 80)

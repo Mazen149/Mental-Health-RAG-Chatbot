@@ -172,6 +172,51 @@ services:
         max-size: "5m"
         max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # Cloudflare Tunnel — optional public HTTPS entrypoint
+  # ---------------------------------------------------------------------------
+  # Publishes the app on a Cloudflare hostname with a valid TLS certificate
+  # without opening any inbound port: cloudflared dials *out* to Cloudflare and
+  # requests are pushed back down that connection. Because nothing depends on
+  # the instance's public IP, the URL keeps working after a restart assigns a
+  # new one.
+  #
+  # Disabled unless CLOUDFLARE_TUNNEL_TOKEN is set — the deploy job only enables
+  # the "tunnel" profile when that secret exists, so the stack is unchanged
+  # otherwise.
+  #
+  # Point the tunnel's public hostname at http://frontend:80 in the Cloudflare
+  # dashboard: nginx already proxies /chat, /login, /register and /transcribe to
+  # the backend, so the whole app is served from a single HTTPS origin (no CORS,
+  # no mixed content, and session cookies / microphone access work).
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: sanad-cloudflared
+    restart: unless-stopped
+
+    profiles:
+      - tunnel
+
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+
+    networks:
+      - sanad-network
+
+    depends_on:
+      frontend:
+        condition: service_started
+
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+
 # =============================================================================
 # Network — isolated bridge network for inter-service communication
 # =============================================================================

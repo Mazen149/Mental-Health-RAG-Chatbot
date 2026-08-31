@@ -43,7 +43,7 @@ const STORAGE_KEY = "sanad_ai_settings";
 const defaults = {
   apiUrl: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
     ? "http://localhost:8000" // Local development backend address
-    : "https://sanad-ai.servehttp.com",
+    : "https://sanad.myddns.me",
   endpoint: "/chat/stream" // Defaulting to SSE streaming
 };
 
@@ -59,7 +59,10 @@ function proxyUrl(url) {
 function loadSettings() {
   try {
     const s = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (s && s.apiUrl && s.apiUrl.includes("myvnc.com")) {
+    // Drop a cached backend URL for a hostname we no longer serve, otherwise a
+    // returning visitor keeps talking to a dead host and sees "failed to fetch".
+    const RETIRED_HOSTS = ["myvnc.com", "servehttp.com"];
+    if (s && s.apiUrl && RETIRED_HOSTS.some((h) => s.apiUrl.includes(h))) {
       delete s.apiUrl;
       localStorage.removeItem(STORAGE_KEY);
     }
